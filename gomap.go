@@ -50,7 +50,8 @@ func (db *GomapDB) Get(key []byte) ([]byte, error) {
 	if len(key) == 0 {
 		return nil, errKeyEmpty
 	}
-	return db.tree.Get(key)
+	// Values are stored directly in the underlying gomap keyed by the user key.
+	return db.store.Get(key)
 }
 
 // Has implements DB.
