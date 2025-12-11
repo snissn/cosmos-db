@@ -6,7 +6,7 @@ require (
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/google/btree v1.1.3
 	github.com/linxGnu/grocksdb v1.8.12
-	github.com/snissn/gomap v0.0.0-20251211095732-c877103c725f
+	github.com/snissn/gomap v0.0.0-20251211193810-9fd0a1f268ef
 	github.com/spf13/cast v1.8.0
 	github.com/stretchr/testify v1.10.0
 	// Pinned to this version to avoid bugs in following commits. See https://github.com/cosmos/cosmos-sdk/pull/14952
