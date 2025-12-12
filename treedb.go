@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cast"
 	"treedb"
+	"treedb/caching"
 )
 
 // TreeDBBackend represents the TreeDB backend.
@@ -17,16 +18,16 @@ func init() {
 	}, false)
 }
 
-// TreeDBWrapper wraps treedb.DB to satisfy cosmosdb.DB interface.
+// TreeDBWrapper wraps caching.DB to satisfy cosmosdb.DB interface.
 type TreeDBWrapper struct {
-	*treedb.DB
+	*caching.DB
 }
 
 // NewTreeDB creates a new TreeDB database at dir/name.db.
 func NewTreeDB(name, dir string, opts Options) (DB, error) {
 	dbPath := filepath.Join(dir, name+".db")
 
-	keepRecent := uint64(10000) // Default to 10000, now that Graveyard is optimized
+	keepRecent := uint64(10000)
 	if opts != nil {
 		if v := opts.Get("keep_recent"); v != nil {
 			keepRecent = cast.ToUint64(v)
@@ -34,16 +35,36 @@ func NewTreeDB(name, dir string, opts Options) (DB, error) {
 	}
 
 	tdbOpts := treedb.Options{
-		Dir:        dbPath,
-		KeepRecent: keepRecent,
+		Dir:            dbPath,
+		KeepRecent:     keepRecent,
+		EnableCaching:  true,
+		FlushThreshold: 4 * 1024 * 1024,
 	}
 
-	db, err := treedb.Open(tdbOpts)
+	db, err := treedb.OpenCached(tdbOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open treedb: %w", err)
+		return nil, fmt.Errorf("failed to open treedb cached: %w", err)
 	}
 
 	return &TreeDBWrapper{db}, nil
+}
+
+// Iterator returns a new iterator.
+func (db *TreeDBWrapper) Iterator(start, end []byte) (Iterator, error) {
+	it, err := db.DB.Iterator(start, end)
+	if err != nil {
+		return nil, err
+	}
+	return &cachingIteratorWrapper{it, start, end}, nil
+}
+
+// ReverseIterator returns a new reverse iterator.
+func (db *TreeDBWrapper) ReverseIterator(start, end []byte) (Iterator, error) {
+	it, err := db.DB.ReverseIterator(start, end)
+	if err != nil {
+		return nil, err
+	}
+	return &cachingIteratorWrapper{it, start, end}, nil
 }
 
 // NewBatch returns a new batch.
@@ -56,12 +77,8 @@ func (db *TreeDBWrapper) NewBatchWithSize(size int) Batch {
 	return db.DB.NewBatchWithSize(size)
 }
 
-// Iterator returns a new iterator.
-func (db *TreeDBWrapper) Iterator(start, end []byte) (Iterator, error) {
-	return db.DB.Iterator(start, end)
-}
-
-// ReverseIterator returns a new reverse iterator.
-func (db *TreeDBWrapper) ReverseIterator(start, end []byte) (Iterator, error) {
-	return db.DB.ReverseIterator(start, end)
-}
+// reusing cachingIteratorWrapper from treemapgemini.go? No, it's private there.
+// I should define it here too or make it public/shared.
+// Since they are in the same package 'db', I can reuse it IF it's in the same package.
+// treemapgemini.go is package db. treedb.go is package db.
+// So cachingIteratorWrapper IS visible.

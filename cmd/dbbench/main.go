@@ -4,17 +4,18 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strings"
 	"time"
 
 	db "github.com/cosmos/cosmos-db"
 )
 
-type phaseResult struct {
-	Ops       int           `json:"ops"`
+type phaseResult struct {	Ops       int           `json:"ops"`
 	Duration  time.Duration `json:"duration"`
 	Throughput float64      `json:"throughput_ops_per_sec"`
 }
@@ -42,13 +43,24 @@ func main() {
 		mixedOps     = flag.Int("mixed-ops", 20000, "number of mixed ops (get/set/delete)")
 		rangeQueries = flag.Int("range-queries", 200, "number of range queries")
 		rangeSpan    = flag.Int("range-span", 100, "number of keys per range")
-		seed         = flag.Int64("seed", 1, "rng seed")
-		jsonOut      = flag.String("json", "", "optional path to write JSON results")
-	)
-	flag.Parse()
-
-	backends := strings.Split(*backendsStr, ",")
-	rng := rand.New(rand.NewSource(*seed))
+				seed         = flag.Int64("seed", 1, "rng seed")
+				jsonOut      = flag.String("json", "", "optional path to write JSON results")
+				cpuProfile   = flag.String("cpuprofile", "", "write cpu profile to file")
+			)
+			flag.Parse()
+		
+			if *cpuProfile != "" {
+				f, err := os.Create(*cpuProfile)
+				if err != nil {
+					log.Fatal(err)
+				}
+				pprof.StartCPUProfile(f)
+				defer pprof.StopCPUProfile()
+			}
+		
+				backends := strings.Split(*backendsStr, ",")
+		
+				rng := rand.New(rand.NewSource(*seed))
 
 	var results []backendResult
 	for _, be := range backends {
