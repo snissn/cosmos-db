@@ -1,6 +1,6 @@
 module github.com/cosmos/cosmos-db
 
-go 1.22.12
+go 1.25.5
 
 require (
 	github.com/cockroachdb/pebble v1.1.5
@@ -12,6 +12,8 @@ require (
 	// Pinned to this version to avoid bugs in following commits. See https://github.com/cosmos/cosmos-sdk/pull/14952
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )
+
+require treedb v0.0.0-00010101000000-000000000000
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
@@ -41,7 +43,7 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
-	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -52,3 +54,5 @@ require (
 replace github.com/linxGnu/grocksdb => github.com/linxGnu/grocksdb v1.8.12
 
 retract v1.1.2
+
+replace treedb => ../gomap/TreeDB
