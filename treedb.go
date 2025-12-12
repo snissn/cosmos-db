@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/spf13/cast"
 	"treedb"
 )
 
@@ -25,8 +26,16 @@ type TreeDBWrapper struct {
 func NewTreeDB(name, dir string, opts Options) (DB, error) {
 	dbPath := filepath.Join(dir, name+".db")
 
+	keepRecent := uint64(10000) // Default to match performance benchmarks
+	if opts != nil {
+		if v := opts.Get("keep_recent"); v != nil {
+			keepRecent = cast.ToUint64(v)
+		}
+	}
+
 	tdbOpts := treedb.Options{
-		Dir: dbPath,
+		Dir:        dbPath,
+		KeepRecent: keepRecent,
 	}
 
 	db, err := treedb.Open(tdbOpts)
