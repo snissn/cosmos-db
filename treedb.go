@@ -26,7 +26,7 @@ type TreeDBWrapper struct {
 func NewTreeDB(name, dir string, opts Options) (DB, error) {
 	dbPath := filepath.Join(dir, name+".db")
 
-	keepRecent := uint64(0) // Default to 0 (aggressive pruning) as it performed better in load tests
+	keepRecent := uint64(10000) // Default to 10000, now that Graveyard is optimized
 	if opts != nil {
 		if v := opts.Get("keep_recent"); v != nil {
 			keepRecent = cast.ToUint64(v)
