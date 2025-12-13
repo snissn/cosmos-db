@@ -106,10 +106,12 @@ github.com/prometheus/procfs v0.9.0 h1:wzCHvIvM5SxWqYvwgVL7yJY8Lz3PKn49KQtpgMYJf
 github.com/prometheus/procfs v0.9.0/go.mod h1:+pB4zwohETzFnmlpe6yd2lSc+0/46IYZRB/chUwxUZY=
 github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
-github.com/snissn/gomap v0.0.0-20251213194008-6672945c365d h1:SHkmhWd+e7KCL5p1sTMvXMbqN50yHVQiN+pN+jFeQas=
-github.com/snissn/gomap v0.0.0-20251213194008-6672945c365d/go.mod h1:it+o67Ig0xc3UETf+/1c/P+IByHutTuTAuad93xoRz4=
-github.com/snissn/gomap/TreeDB v0.0.0-20251213194008-6672945c365d h1:ZVd7tiOomaCfj3vYPnwlbSmWCRAz3zppVReR70/dZSk=
-github.com/snissn/gomap/TreeDB v0.0.0-20251213194008-6672945c365d/go.mod h1:fVPyfFHnrSXZE6+PyVgesM/aABj0ilyYif9Nq+LPQOA=
+github.com/snissn/gomap v0.0.0-20251213211414-2bf353deb628 h1:nmXPdBQAACNA2YhL9j7m31g3y4TdnzwdDVYwyqtC70M=
+github.com/snissn/gomap v0.0.0-20251213211414-2bf353deb628/go.mod h1:it+o67Ig0xc3UETf+/1c/P+IByHutTuTAuad93xoRz4=
+github.com/snissn/gomap/GeminiTreeDB v0.0.0-20251213211414-2bf353deb628 h1:nRVaCIWoaM4b+TxSixFWhh793yrR/II8Fvw6t5bnc9g=
+github.com/snissn/gomap/GeminiTreeDB v0.0.0-20251213211414-2bf353deb628/go.mod h1:faHE6MLL2uCoNpcnT+TvCKNSzcwjtjMiGABl7CVNJjk=
+github.com/snissn/gomap/TreeDB v0.0.0-20251213211414-2bf353deb628 h1:ZpjTyRhpjd8+NAHgGO3U2MfYyTyqnOxertTeUs7A/1Q=
+github.com/snissn/gomap/TreeDB v0.0.0-20251213211414-2bf353deb628/go.mod h1:fVPyfFHnrSXZE6+PyVgesM/aABj0ilyYif9Nq+LPQOA=
 github.com/spf13/cast v1.8.0 h1:gEN9K4b8Xws4EX0+a0reLmhq8moKn7ntRlQYgjPeCDk=
 github.com/spf13/cast v1.8.0/go.mod h1:ancEpBxwJDODSW/UG4rDrAqiKolqNNh2DX3mk86cAdo=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
