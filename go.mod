@@ -7,13 +7,12 @@ require (
 	github.com/google/btree v1.1.3
 	github.com/linxGnu/grocksdb v1.8.12
 	github.com/snissn/gomap v0.0.0-20251213170657-d2d2923dd931
+	github.com/snissn/gomap/TreeDB v0.0.0-20251213170657-d2d2923dd931
 	github.com/spf13/cast v1.8.0
 	github.com/stretchr/testify v1.10.0
 	// Pinned to this version to avoid bugs in following commits. See https://github.com/cosmos/cosmos-sdk/pull/14952
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )
-
-require treedb v0.0.0-00010101000000-000000000000
 
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
@@ -54,5 +53,3 @@ require (
 replace github.com/linxGnu/grocksdb => github.com/linxGnu/grocksdb v1.8.12
 
 retract v1.1.2
-
-replace treedb => github.com/snissn/gomap/TreeDB v0.0.0-20251213170657-d2d2923dd931

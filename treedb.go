@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cast"
-	"treedb"
-	"treedb/caching"
+	treedb "github.com/snissn/gomap/TreeDB"
+	"github.com/snissn/gomap/TreeDB/caching"
 )
 
 // TreeDBBackend represents the TreeDB backend.
