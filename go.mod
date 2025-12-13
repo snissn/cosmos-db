@@ -14,8 +14,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )
 
-require github.com/snissn/gomap-gemini/TreeDB v0.0.0-00010101000000-000000000000
-
 require (
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -53,7 +51,5 @@ require (
 // grocksdb stays at v1.8.x in cosmos-db as it should support RocksDB v8.
 // the cosmos sdk v2 uses directly store/v2 which uses RocksDB v9 from 0.52+
 replace github.com/linxGnu/grocksdb => github.com/linxGnu/grocksdb v1.8.12
-
-replace github.com/snissn/gomap-gemini/TreeDB => github.com/snissn/gomap/GeminiTreeDB v0.0.0-20251213211414-2bf353deb628
 
 retract v1.1.2

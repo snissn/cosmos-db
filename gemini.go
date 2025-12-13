@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	geminicaching "github.com/snissn/gomap-gemini/TreeDB/caching"
-	geminidb "github.com/snissn/gomap-gemini/TreeDB/db"
+	geminicaching "github.com/snissn/gomap/TreeDB/caching"
+	geminidb "github.com/snissn/gomap/TreeDB"
 	"github.com/spf13/cast"
 )
 
