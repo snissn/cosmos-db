@@ -77,6 +77,12 @@ func (db *TreeDBWrapper) NewBatchWithSize(size int) Batch {
 	return db.DB.NewBatchWithSize(size)
 }
 
+// Print delegates to the underlying caching.DB.
+func (db *TreeDBWrapper) Print() error {
+	return db.DB.Print()
+}
+
+
 // reusing cachingIteratorWrapper from treemapgemini.go? No, it's private there.
 // I should define it here too or make it public/shared.
 // Since they are in the same package 'db', I can reuse it IF it's in the same package.

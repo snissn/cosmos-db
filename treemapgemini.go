@@ -76,6 +76,12 @@ func (db *TreeMapGeminiWrapper) NewBatchWithSize(size int) Batch {
 	return db.DB.NewBatchWithSize(size)
 }
 
+// Print delegates to the underlying caching.DB.
+func (db *TreeMapGeminiWrapper) Print() error {
+	return db.DB.Print()
+}
+
+
 type cachingIteratorWrapper struct {
 	it    interface {
 		Next()
