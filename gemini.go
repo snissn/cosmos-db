@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	geminicaching "github.com/snissn/gomap-gemini/TreeDB/caching"
@@ -32,6 +33,10 @@ type GeminiWrapper struct {
 // NewGeminiDB creates a new Gemini database.
 func NewGeminiDB(name, dir string, opts Options) (DB, error) {
 	dbPath := filepath.Join(dir, name+".db")
+
+	if err := os.MkdirAll(dbPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create gemini db dir: %w", err)
+	}
 
 	chunkSize := int64(64 * 1024 * 1024)
 	keepRecent := uint64(10000)
@@ -94,6 +99,10 @@ type GeminiCachedWrapper struct {
 // NewGeminiCachedDB creates a new Gemini database with caching.
 func NewGeminiCachedDB(name, dir string, opts Options) (DB, error) {
 	dbPath := filepath.Join(dir, name+".db")
+
+	if err := os.MkdirAll(dbPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create gemini cached db dir: %w", err)
+	}
 
 	chunkSize := int64(64 * 1024 * 1024)
 	flushThreshold := int64(4 * 1024 * 1024)
