@@ -37,7 +37,7 @@ type backendResult struct {
 
 func main() {
 	var (
-		backendsStr  = flag.String("backends", "gomap,goleveldb,pebbledb,memdb", "comma-separated backends to run")
+		backendsStr  = flag.String("backends", "gomap,goleveldb,pebbledb,memdb,gemini,geminicached", "comma-separated backends to run")
 		keys         = flag.Int("keys", 10000, "number of keys to load")
 		valueBytes   = flag.Int("value-bytes", 128, "value size in bytes")
 		mixedOps     = flag.Int("mixed-ops", 20000, "number of mixed ops (get/set/delete)")
