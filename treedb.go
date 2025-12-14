@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/spf13/cast"
 	treedb "github.com/snissn/gomap/TreeDB"
 	"github.com/snissn/gomap/TreeDB/caching"
+	"github.com/spf13/cast"
 )
 
 // TreeDBBackend represents the TreeDB backend.
@@ -81,7 +81,6 @@ func (db *TreeDBWrapper) NewBatchWithSize(size int) Batch {
 func (db *TreeDBWrapper) Print() error {
 	return db.DB.Print()
 }
-
 
 // reusing cachingIteratorWrapper from treemapgemini.go? No, it's private there.
 // I should define it here too or make it public/shared.

@@ -1,13 +1,12 @@
 module github.com/cosmos/cosmos-db
 
-go 1.25.5
+go 1.25.4
 
 require (
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/google/btree v1.1.3
 	github.com/linxGnu/grocksdb v1.8.12
 	github.com/snissn/gomap v0.0.0-20251214024345-5ffa0afd4b44
-	github.com/snissn/gomap-gemini/TreeDB v0.0.0
 	github.com/snissn/gomap/TreeDB v0.0.0-20251213211414-2bf353deb628
 	github.com/spf13/cast v1.8.0
 	github.com/stretchr/testify v1.10.0
@@ -52,7 +51,5 @@ require (
 // grocksdb stays at v1.8.x in cosmos-db as it should support RocksDB v8.
 // the cosmos sdk v2 uses directly store/v2 which uses RocksDB v9 from 0.52+
 replace github.com/linxGnu/grocksdb => github.com/linxGnu/grocksdb v1.8.12
-
-replace github.com/snissn/gomap-gemini/TreeDB => ../../gomap/GeminiTreeDB
 
 retract v1.1.2

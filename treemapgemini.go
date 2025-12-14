@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/spf13/cast"
 	treedb "github.com/snissn/gomap/TreeDB"
 	"github.com/snissn/gomap/TreeDB/caching"
+	"github.com/spf13/cast"
 )
 
 // TreeMapGeminiBackend represents the TreeMapGemini backend.
@@ -66,6 +66,7 @@ func (db *TreeMapGeminiWrapper) ReverseIterator(start, end []byte) (Iterator, er
 	}
 	return &cachingIteratorWrapper{it, start, end}, nil
 }
+
 // NewBatch returns a new batch.
 func (db *TreeMapGeminiWrapper) NewBatch() Batch {
 	return db.DB.NewBatch()
@@ -81,9 +82,8 @@ func (db *TreeMapGeminiWrapper) Print() error {
 	return db.DB.Print()
 }
 
-
 type cachingIteratorWrapper struct {
-	it    interface {
+	it interface {
 		Next()
 		Valid() bool
 		Key() []byte
@@ -98,6 +98,6 @@ func (w *cachingIteratorWrapper) Domain() ([]byte, []byte) { return w.start, w.e
 func (w *cachingIteratorWrapper) Valid() bool              { return w.it.Valid() }
 func (w *cachingIteratorWrapper) Next()                    { w.it.Next() }
 func (w *cachingIteratorWrapper) Key() []byte              { return w.it.Key() }
-func (w *cachingIteratorWrapper) Value() []byte              { return w.it.Value() }
+func (w *cachingIteratorWrapper) Value() []byte            { return w.it.Value() }
 func (w *cachingIteratorWrapper) Error() error             { return w.it.Error() }
 func (w *cachingIteratorWrapper) Close() error             { return w.it.Close() }

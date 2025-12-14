@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
+	geminidb "github.com/snissn/gomap/TreeDB"
+	geminicaching "github.com/snissn/gomap/TreeDB/caching"
 	"github.com/spf13/cast"
-	geminicaching "github.com/snissn/gomap-gemini/TreeDB/caching"
-	geminidb "github.com/snissn/gomap-gemini/TreeDB/db"
 )
 
 // CachedGeminiTreeDBBackend represents the CachedGeminiTreeDB backend.
