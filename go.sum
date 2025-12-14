@@ -110,6 +110,8 @@ github.com/snissn/gomap v0.0.0-20251213211414-2bf353deb628 h1:nmXPdBQAACNA2YhL9j
 github.com/snissn/gomap v0.0.0-20251213211414-2bf353deb628/go.mod h1:it+o67Ig0xc3UETf+/1c/P+IByHutTuTAuad93xoRz4=
 github.com/snissn/gomap v0.0.0-20251214023423-c8ff867efc1e h1:A8m0ZeZkq93y2gRSFD6Mu1UesePWMk3uEYPfGdJ+nD4=
 github.com/snissn/gomap v0.0.0-20251214023423-c8ff867efc1e/go.mod h1:it+o67Ig0xc3UETf+/1c/P+IByHutTuTAuad93xoRz4=
+github.com/snissn/gomap v0.0.0-20251214024345-5ffa0afd4b44 h1:y8k9tJI1ZBLLrD3UBGNwTcqqmzsKAaMvl0HWoCcKecY=
+github.com/snissn/gomap v0.0.0-20251214024345-5ffa0afd4b44/go.mod h1:it+o67Ig0xc3UETf+/1c/P+IByHutTuTAuad93xoRz4=
 github.com/snissn/gomap/TreeDB v0.0.0-20251213211414-2bf353deb628 h1:ZpjTyRhpjd8+NAHgGO3U2MfYyTyqnOxertTeUs7A/1Q=
 github.com/snissn/gomap/TreeDB v0.0.0-20251213211414-2bf353deb628/go.mod h1:fVPyfFHnrSXZE6+PyVgesM/aABj0ilyYif9Nq+LPQOA=
 github.com/spf13/cast v1.8.0 h1:gEN9K4b8Xws4EX0+a0reLmhq8moKn7ntRlQYgjPeCDk=

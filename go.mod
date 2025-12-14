@@ -6,7 +6,7 @@ require (
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/google/btree v1.1.3
 	github.com/linxGnu/grocksdb v1.8.12
-	github.com/snissn/gomap v0.0.0-20251214023423-c8ff867efc1e
+	github.com/snissn/gomap v0.0.0-20251214024345-5ffa0afd4b44
 	github.com/snissn/gomap-gemini/TreeDB v0.0.0
 	github.com/snissn/gomap/TreeDB v0.0.0-20251213211414-2bf353deb628
 	github.com/spf13/cast v1.8.0
