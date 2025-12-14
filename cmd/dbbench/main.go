@@ -31,6 +31,7 @@ type backendResult struct {
 	Backend   string       `json:"backend"`
 	Load      phaseResult  `json:"load"`
 	Mixed     phaseResult  `json:"mixed"`
+	FullScan  phaseResult  `json:"full_scan"` // Added this field
 	RangeScan rangeResult  `json:"range_scan"`
 	Error     string       `json:"error,omitempty"`
 }
@@ -38,29 +39,29 @@ type backendResult struct {
 func main() {
 	var (
 		backendsStr  = flag.String("backends", "gomap,goleveldb,pebbledb,memdb,gemini,geminicached", "comma-separated backends to run")
-		keys         = flag.Int("keys", 10000, "number of keys to load")
+		keys         = flag.Int("keys", 100000, "number of keys to load") // Changed from 10000 to 100000
 		valueBytes   = flag.Int("value-bytes", 128, "value size in bytes")
 		mixedOps     = flag.Int("mixed-ops", 20000, "number of mixed ops (get/set/delete)")
 		rangeQueries = flag.Int("range-queries", 200, "number of range queries")
 		rangeSpan    = flag.Int("range-span", 100, "number of keys per range")
-				seed         = flag.Int64("seed", 1, "rng seed")
-				jsonOut      = flag.String("json", "", "optional path to write JSON results")
-				cpuProfile   = flag.String("cpuprofile", "", "write cpu profile to file")
-			)
-			flag.Parse()
-		
-			if *cpuProfile != "" {
-				f, err := os.Create(*cpuProfile)
-				if err != nil {
-					log.Fatal(err)
-				}
-				pprof.StartCPUProfile(f)
-				defer pprof.StopCPUProfile()
-			}
-		
-				backends := strings.Split(*backendsStr, ",")
-		
-				rng := rand.New(rand.NewSource(*seed))
+		seed         = flag.Int64("seed", 1, "rng seed")
+		jsonOut      = flag.String("json", "", "optional path to write JSON results")
+		cpuProfile   = flag.String("cpuprofile", "", "write cpu profile to file")
+	)
+	flag.Parse()
+
+	if *cpuProfile != "" {
+		f, err := os.Create(*cpuProfile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
+	backends := strings.Split(*backendsStr, ",")
+
+	rng := rand.New(rand.NewSource(*seed))
 
 	var results []backendResult
 	for _, be := range backends {
@@ -153,8 +154,34 @@ func runBackend(backend string, keys, valueBytes, mixedOps, rangeQueries, rangeS
 		Throughput: float64(mixedOps) / mixedDur.Seconds(),
 	}
 
-	// Range scans
-	start = time.Now()
+	// Full scan (to match unified_bench's "Scan" test)
+	scanStart := time.Now()
+	it, err := database.Iterator(nil, nil)
+	if err != nil {
+		res.Error = fmt.Sprintf("full scan iterator: %v", err)
+		return res
+	}
+	defer it.Close()
+	scannedKeys := 0
+	for it.Valid() {
+		_ = it.Key()
+		_ = it.Value()
+		it.Next()
+		scannedKeys++
+	}
+	if err := it.Error(); err != nil {
+		res.Error = fmt.Sprintf("full scan iterator error: %v", err)
+		return res
+	}
+	fullScanDur := time.Since(scanStart)
+	res.FullScan = phaseResult{ // Add new field for full scan results
+		Ops:       scannedKeys,
+		Duration:  fullScanDur,
+		Throughput: float64(scannedKeys) / fullScanDur.Seconds(),
+	}
+
+	// Original Range scans (renaming to avoid conflict with full scan)
+	rangeScanStart := time.Now()
 	for i := 0; i < rangeQueries; i++ {
 		startIdx := rng.Intn(len(keysArr))
 		endIdx := startIdx + rangeSpan
@@ -184,7 +211,7 @@ func runBackend(backend string, keys, valueBytes, mixedOps, rangeQueries, rangeS
 		}
 		it.Close()
 	}
-	rangeDur := time.Since(start)
+	rangeDur := time.Since(rangeScanStart)
 	res.RangeScan = rangeResult{
 		Ranges:    rangeQueries,
 		Span:      rangeSpan,
@@ -203,6 +230,7 @@ func printResult(res backendResult) {
 	}
 	fmt.Printf("load:   ops=%d dur=%s thr=%.1f ops/s\n", res.Load.Ops, res.Load.Duration, res.Load.Throughput)
 	fmt.Printf("mixed:  ops=%d dur=%s thr=%.1f ops/s\n", res.Mixed.Ops, res.Mixed.Duration, res.Mixed.Throughput)
+	fmt.Printf("full scan: ops=%d dur=%s thr=%.1f ops/s\n", res.FullScan.Ops, res.FullScan.Duration, res.FullScan.Throughput) // Print full scan
 	fmt.Printf("range:  ranges=%d span=%d dur=%s thr=%.1f ranges/s\n\n",
 		res.RangeScan.Ranges, res.RangeScan.Span, res.RangeScan.Duration, res.RangeScan.Throughput)
 }
