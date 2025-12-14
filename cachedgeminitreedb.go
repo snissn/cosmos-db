@@ -113,27 +113,8 @@ type cachedGeminiIteratorWrapper struct {
 
 func (w *cachedGeminiIteratorWrapper) Domain() ([]byte, []byte) { return w.start, w.end }
 func (w *cachedGeminiIteratorWrapper) Valid() bool              { return w.it.Valid() }
-
-func (w *cachedGeminiIteratorWrapper) Next() {
-	if !w.Valid() {
-		panic("Next called on invalid iterator")
-	}
-	w.it.Next()
-}
-
-func (w *cachedGeminiIteratorWrapper) Key() []byte {
-	if !w.Valid() {
-		panic("Key called on invalid iterator")
-	}
-	return w.it.Key()
-}
-
-func (w *cachedGeminiIteratorWrapper) Value() []byte {
-	if !w.Valid() {
-		panic("Value called on invalid iterator")
-	}
-	return w.it.Value()
-}
-
-func (w *cachedGeminiIteratorWrapper) Error() error { return w.it.Error() }
-func (w *cachedGeminiIteratorWrapper) Close() error { return w.it.Close() }
+func (w *cachedGeminiIteratorWrapper) Next()                    { w.it.Next() }
+func (w *cachedGeminiIteratorWrapper) Key() []byte              { return w.it.Key() }
+func (w *cachedGeminiIteratorWrapper) Value() []byte            { return w.it.Value() }
+func (w *cachedGeminiIteratorWrapper) Error() error             { return w.it.Error() }
+func (w *cachedGeminiIteratorWrapper) Close() error             { return w.it.Close() }
