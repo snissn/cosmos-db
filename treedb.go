@@ -12,6 +12,7 @@ import (
 
 func init() {
 	registerDBCreator(TreeDBBackend, NewTreeDBDB, false)
+	registerDBCreator(BackendType("db_backend treedb"), NewTreeDBDB, false)
 }
 
 type TreeDB struct {
