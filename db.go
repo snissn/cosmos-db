@@ -20,6 +20,10 @@ const (
 	// PebbleDBBackend represents pebble (uses github.com/cockroachdb/pebble)
 	//   - pure go
 	PebbleDBBackend BackendType = "pebbledb"
+	// TreeDBBackend represents treedb (uses github.com/snissn/gomap/TreeDB)
+	//   - pure go
+	//   - ordered iterators + snapshots
+	TreeDBBackend BackendType = "treedb"
 	// RocksDBBackend represents rocksdb (uses github.com/linxGnu/grocksdb)
 	//   - requires gcc
 	//   - use rocksdb build tag (go build -tags rocksdb)

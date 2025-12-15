@@ -8,31 +8,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPebbleDBBackend(t *testing.T) {
+func TestTreeDBBackend(t *testing.T) {
 	name := fmt.Sprintf("test_%x", randStr(12))
 	dir := os.TempDir()
-	db, err := NewDB(name, PebbleDBBackend, dir)
+	db, err := NewDB(name, TreeDBBackend, dir)
 	require.NoError(t, err)
 	defer cleanupDBDir(dir, name)
 
-	_, ok := db.(*PebbleDB)
+	_, ok := db.(*TreeDB)
 	require.True(t, ok)
 }
 
-// func TestPebbleDBStats(t *testing.T) {
-// 	name := fmt.Sprintf("test_%x", randStr(12))
-// 	dir := os.TempDir()
-// 	db, err := NewDB(name, PebbleDBBackend, dir)
-// 	require.NoError(t, err)
-// 	defer cleanupDBDir(dir, name)
-
-// 	require.NotEmpty(t, db.Stats())
-// }
-
-func BenchmarkPebbleDBRandomReadsWrites(b *testing.B) {
+func BenchmarkTreeDBRandomReadsWrites(b *testing.B) {
 	name := fmt.Sprintf("test_%x", randStr(12))
 	dir := os.TempDir()
-	db, err := NewDB(name, PebbleDBBackend, dir)
+	db, err := NewDB(name, TreeDBBackend, dir)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -44,10 +34,10 @@ func BenchmarkPebbleDBRandomReadsWrites(b *testing.B) {
 	benchmarkRandomReadsWrites(b, db)
 }
 
-func BenchmarkPebbleDBRangeScans1M(b *testing.B) {
+func BenchmarkTreeDBRangeScans1M(b *testing.B) {
 	name := fmt.Sprintf("test_%x", randStr(12))
 	dir := os.TempDir()
-	db, err := NewDB(name, PebbleDBBackend, dir)
+	db, err := NewDB(name, TreeDBBackend, dir)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -59,10 +49,10 @@ func BenchmarkPebbleDBRangeScans1M(b *testing.B) {
 	benchmarkRangeScans(b, db, int64(1e6))
 }
 
-func BenchmarkPebbleDBRangeScans10M(b *testing.B) {
+func BenchmarkTreeDBRangeScans10M(b *testing.B) {
 	name := fmt.Sprintf("test_%x", randStr(12))
 	dir := os.TempDir()
-	db, err := NewDB(name, PebbleDBBackend, dir)
+	db, err := NewDB(name, TreeDBBackend, dir)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -73,5 +63,3 @@ func BenchmarkPebbleDBRangeScans10M(b *testing.B) {
 
 	benchmarkRangeScans(b, db, int64(10e6))
 }
-
-// TODO: Add tests for pebble

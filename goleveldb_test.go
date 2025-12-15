@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -30,14 +31,45 @@ func TestGoLevelDBNewGoLevelDB(t *testing.T) {
 
 func BenchmarkGoLevelDBRandomReadsWrites(b *testing.B) {
 	name := fmt.Sprintf("test_%x", randStr(12))
-	db, err := NewGoLevelDB(name, "", nil)
+	dir := os.TempDir()
+	db, err := NewGoLevelDB(name, dir, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer func() {
 		require.NoError(b, db.Close())
-		cleanupDBDir("", name)
+		cleanupDBDir(dir, name)
 	}()
 
 	benchmarkRandomReadsWrites(b, db)
+}
+
+func BenchmarkGoLevelDBRangeScans1M(b *testing.B) {
+	name := fmt.Sprintf("test_%x", randStr(12))
+	dir := os.TempDir()
+	db, err := NewGoLevelDB(name, dir, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		require.NoError(b, db.Close())
+		cleanupDBDir(dir, name)
+	}()
+
+	benchmarkRangeScans(b, db, int64(1e6))
+}
+
+func BenchmarkGoLevelDBRangeScans10M(b *testing.B) {
+	name := fmt.Sprintf("test_%x", randStr(12))
+	dir := os.TempDir()
+	db, err := NewGoLevelDB(name, dir, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		require.NoError(b, db.Close())
+		cleanupDBDir(dir, name)
+	}()
+
+	benchmarkRangeScans(b, db, int64(10e6))
 }

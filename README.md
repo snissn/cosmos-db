@@ -12,7 +12,7 @@ Common database interface for various database backends. Primarily meant for app
 
 ### Minimum Go Version
 
-Go 1.19+
+Go 1.25+
 
 ## Supported Database Backends
 
@@ -25,6 +25,8 @@ Go 1.19+
 - **[RocksDB](https://github.com/cosmos/gorocksdb):** A [Go wrapper](https://github.com/cosmos/gorocksdb) around [RocksDB](https://rocksdb.org). Similarly to LevelDB (above) it uses LSM-trees for on-disk storage, but is optimized for fast storage media such as SSDs and memory. Supports atomic transactions, but not full ACID transactions.
 
 - **[Pebble](https://github.com/cockroachdb/pebble):** a RocksDB/LevelDB inspired key-value database in Go using RocksDB file format and LSM-trees for on-disk storage. Supports snapshots.
+
+- **[TreeDB](https://github.com/snissn/gomap/tree/MASTER/TreeDB):** a B+Tree-backed ordered key-value store. Supports point-in-time iterators (snapshots) and a cached (write-back) mode with WAL.
 
 ## Meta-databases
 

@@ -61,3 +61,48 @@ func TestRocksDBWithOptions(t *testing.T) {
 
 	t.Run("RocksDB", func(t *testing.T) { Run(t, db) })
 }
+
+func BenchmarkRocksDBRandomReadsWrites(b *testing.B) {
+	name := fmt.Sprintf("test_%x", randStr(12))
+	dir := os.TempDir()
+	db, err := NewDB(name, RocksDBBackend, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		require.NoError(b, db.Close())
+		cleanupDBDir(dir, name)
+	}()
+
+	benchmarkRandomReadsWrites(b, db)
+}
+
+func BenchmarkRocksDBRangeScans1M(b *testing.B) {
+	name := fmt.Sprintf("test_%x", randStr(12))
+	dir := os.TempDir()
+	db, err := NewDB(name, RocksDBBackend, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		require.NoError(b, db.Close())
+		cleanupDBDir(dir, name)
+	}()
+
+	benchmarkRangeScans(b, db, int64(1e6))
+}
+
+func BenchmarkRocksDBRangeScans10M(b *testing.B) {
+	name := fmt.Sprintf("test_%x", randStr(12))
+	dir := os.TempDir()
+	db, err := NewDB(name, RocksDBBackend, dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		require.NoError(b, db.Close())
+		cleanupDBDir(dir, name)
+	}()
+
+	benchmarkRangeScans(b, db, int64(10e6))
+}
