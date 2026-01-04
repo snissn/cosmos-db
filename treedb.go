@@ -17,6 +17,8 @@ import (
 
 const memtableMode = "adaptive"
 
+const TreeDBBackend BackendType = "treedb"
+
 const (
 	envDisableWAL                    = "TREEDB_BENCH_DISABLE_WAL"
 	envDisableBG                     = "TREEDB_BENCH_DISABLE_BG"
@@ -134,6 +136,17 @@ func envString(name string, defaultValue string) string {
 	return v
 }
 
+func setOptionalBool(opts *treedb.Options, fieldName string, value bool) {
+	v := reflect.ValueOf(opts).Elem()
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() || !field.CanSet() {
+		return
+	}
+	if field.Kind() == reflect.Bool {
+		field.SetBool(value)
+	}
+}
+
 func setAllowUnsafe(opts *treedb.Options, allow bool) {
 	v := reflect.ValueOf(opts).Elem()
 	field := v.FieldByName("AllowUnsafe")
@@ -190,7 +203,6 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		// --- "Unsafe" Performance Options ---
 		DisableWAL:               disableWAL,
 		DisableValueLog:          disableValueLog,
-		SplitValueLog:            splitValueLog,
 		RelaxedSync:              relaxedSync,
 		DisableReadChecksum:      disableReadChecksum,
 		MemtableValueLogPointers: !disableValueLog,
@@ -213,6 +225,7 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		//BackgroundCompactionInterval:  1 * time.Second,
 		//BackgroundCompactionDeadRatio: 0.1,
 	}
+	setOptionalBool(&openOpts, "SplitValueLog", splitValueLog)
 	setAllowUnsafe(&openOpts, allowUnsafe)
 
 	if disableBG {
