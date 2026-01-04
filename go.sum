@@ -97,6 +97,8 @@ github.com/snissn/gomap v0.0.0-20251229170756-b69ad617e4ea h1:ZXBxX41SYBRb2bHQE8
 github.com/snissn/gomap v0.0.0-20251229170756-b69ad617e4ea/go.mod h1:ouXhmNCIGcgrXWAfjDqNlv1CWHXYswUHCF9siiFomzw=
 github.com/snissn/gomap v0.0.0-20260104205000-76f0689ef170 h1:913LyXnPiTTfmVQB/+j+aVsFteZy8NKqY42oMNYD87c=
 github.com/snissn/gomap v0.0.0-20260104205000-76f0689ef170/go.mod h1:ouXhmNCIGcgrXWAfjDqNlv1CWHXYswUHCF9siiFomzw=
+github.com/snissn/gomap v0.0.0-20260104214553-5113b59b371d h1:ieAKuCnO4sXKTS6UiXhrh+5UnKQ02Piioee31CtEKiA=
+github.com/snissn/gomap v0.0.0-20260104214553-5113b59b371d/go.mod h1:ouXhmNCIGcgrXWAfjDqNlv1CWHXYswUHCF9siiFomzw=
 github.com/spf13/cast v1.8.0 h1:gEN9K4b8Xws4EX0+a0reLmhq8moKn7ntRlQYgjPeCDk=
 github.com/spf13/cast v1.8.0/go.mod h1:ancEpBxwJDODSW/UG4rDrAqiKolqNNh2DX3mk86cAdo=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=

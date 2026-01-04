@@ -33,6 +33,7 @@ const (
 	envSlabCompression     = "TREEDB_SLAB_COMPRESSION"
 	envSlabCompMinBytes    = "TREEDB_SLAB_COMPRESSION_MIN_BYTES"
 	envSlabCompMinSavings  = "TREEDB_SLAB_COMPRESSION_MIN_SAVINGS"
+	envLeafPrefixCompress  = "TREEDB_LEAF_PREFIX_COMPRESSION"
 	envDisableIndexVacuum  = "TREEDB_DISABLE_INDEX_VACUUM"
 	envSyncMode            = "TREEDB_SYNC_MODE"
 )
@@ -180,6 +181,7 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 	disableReadChecksum := envBool(envDisableReadChecksum, true)
 	forceValuePointers := envBool(envForceValuePointers, true)
 	valueLogThreshold := envInt(envValueLogThreshold, 256)
+	leafPrefixCompression := envBool(envLeafPrefixCompress, false)
 	slabCompression := parseSlabCompression(
 		envString(envSlabCompression, "zstd"),
 		envInt(envSlabCompMinBytes, 0),
@@ -217,6 +219,7 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 
 		ForceValuePointers:       forceValuePointers,
 		ValueLogPointerThreshold: valueLogThreshold,
+		LeafPrefixCompression:    leafPrefixCompression,
 		SlabCompression:          slabCompression,
 
 		PreferAppendAlloc:             false,
