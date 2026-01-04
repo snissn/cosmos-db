@@ -11,6 +11,7 @@ import (
 	"time"
 
 	treedb "github.com/snissn/gomap/TreeDB"
+	"github.com/snissn/gomap/TreeDB/slab"
 	"github.com/snissn/gomap/TreeDB/tree"
 	treedbadapter "github.com/snissn/gomap/kvstore/adapters/treedb"
 )
@@ -27,6 +28,13 @@ const (
 	envMode                = "TREEDB_BENCH_MODE"
 	envPinSnapshot         = "TREEDB_BENCH_PIN_SNAPSHOT"
 	envReuseReads          = "TREEDB_BENCH_REUSE_READS"
+	envForceValuePointers  = "TREEDB_FORCE_VALUE_POINTERS"
+	envValueLogThreshold   = "TREEDB_VALUELOG_POINTER_THRESHOLD"
+	envSlabCompression     = "TREEDB_SLAB_COMPRESSION"
+	envSlabCompMinBytes    = "TREEDB_SLAB_COMPRESSION_MIN_BYTES"
+	envSlabCompMinSavings  = "TREEDB_SLAB_COMPRESSION_MIN_SAVINGS"
+	envDisableIndexVacuum  = "TREEDB_DISABLE_INDEX_VACUUM"
+	envSyncMode            = "TREEDB_SYNC_MODE"
 )
 
 func init() {
@@ -98,6 +106,22 @@ func envInt64(name string, defaultValue int64) int64 {
 	return n
 }
 
+func envInt(name string, defaultValue int) int {
+	v, ok := os.LookupEnv(name)
+	if !ok {
+		return defaultValue
+	}
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return defaultValue
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return defaultValue
+	}
+	return n
+}
+
 func envString(name string, defaultValue string) string {
 	v, ok := os.LookupEnv(name)
 	if !ok {
@@ -108,6 +132,21 @@ func envString(name string, defaultValue string) string {
 		return defaultValue
 	}
 	return v
+}
+
+func parseSlabCompression(name string, minBytes int, minSavings int) slab.CompressionOptions {
+	opts := slab.CompressionOptions{
+		Kind:            slab.CompressionNone,
+		MinBytes:        minBytes,
+		MinSavingsBytes: minSavings,
+	}
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "none", "off", "false":
+		opts.Kind = slab.CompressionNone
+	case "zstd":
+		opts.Kind = slab.CompressionZSTD
+	}
+	return opts
 }
 
 func setAllowUnsafe(opts *treedb.Options, allow bool) {
@@ -139,6 +178,15 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 	relaxedSync := envBool(envRelaxedSync, true)
 	disableValueLog := envBool(envDisableValueLog, false)
 	disableReadChecksum := envBool(envDisableReadChecksum, true)
+	forceValuePointers := envBool(envForceValuePointers, true)
+	valueLogThreshold := envInt(envValueLogThreshold, 256)
+	slabCompression := parseSlabCompression(
+		envString(envSlabCompression, "zstd"),
+		envInt(envSlabCompMinBytes, 0),
+		envInt(envSlabCompMinSavings, 0),
+	)
+	disableIndexVacuum := envBool(envDisableIndexVacuum, false)
+	syncMode := envBool(envSyncMode, false)
 	_, allowUnsafeSet := os.LookupEnv(envAllowUnsafe)
 	allowUnsafe := envBool(envAllowUnsafe, false)
 	if !allowUnsafeSet && (disableWAL || relaxedSync || disableReadChecksum) {
@@ -167,6 +215,10 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		FlushBuildConcurrency: 4,
 		ChunkSize:             64 * 1024 * 1024,
 
+		ForceValuePointers:       forceValuePointers,
+		ValueLogPointerThreshold: valueLogThreshold,
+		SlabCompression:          slabCompression,
+
 		PreferAppendAlloc:             false,
 		KeepRecent:                    1,
 		BackgroundIndexVacuumInterval: 15 * time.Second,
@@ -184,6 +236,9 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		openOpts.BackgroundCheckpointInterval = -1
 		openOpts.MaxWALBytes = -1
 		openOpts.BackgroundCheckpointIdleDuration = -1
+	}
+	if disableIndexVacuum || syncMode {
+		openOpts.BackgroundIndexVacuumInterval = -1
 	}
 
 	tdb, err := treedb.Open(openOpts)

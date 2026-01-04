@@ -95,6 +95,8 @@ github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
 github.com/snissn/gomap v0.0.0-20251229170756-b69ad617e4ea h1:ZXBxX41SYBRb2bHQE8OqtiHa+vBch8b5f8WdlwQTXUU=
 github.com/snissn/gomap v0.0.0-20251229170756-b69ad617e4ea/go.mod h1:ouXhmNCIGcgrXWAfjDqNlv1CWHXYswUHCF9siiFomzw=
+github.com/snissn/gomap v0.0.0-20260104205000-76f0689ef170 h1:913LyXnPiTTfmVQB/+j+aVsFteZy8NKqY42oMNYD87c=
+github.com/snissn/gomap v0.0.0-20260104205000-76f0689ef170/go.mod h1:ouXhmNCIGcgrXWAfjDqNlv1CWHXYswUHCF9siiFomzw=
 github.com/spf13/cast v1.8.0 h1:gEN9K4b8Xws4EX0+a0reLmhq8moKn7ntRlQYgjPeCDk=
 github.com/spf13/cast v1.8.0/go.mod h1:ancEpBxwJDODSW/UG4rDrAqiKolqNNh2DX3mk86cAdo=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
