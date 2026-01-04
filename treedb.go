@@ -18,16 +18,21 @@ import (
 const memtableMode = "adaptive"
 
 const (
-	envDisableWAL          = "TREEDB_BENCH_DISABLE_WAL"
-	envDisableBG           = "TREEDB_BENCH_DISABLE_BG"
-	envRelaxedSync         = "TREEDB_BENCH_RELAXED_SYNC"
-	envDisableValueLog     = "TREEDB_BENCH_DISABLE_VALUE_LOG"
-	envDisableReadChecksum = "TREEDB_BENCH_DISABLE_READ_CHECKSUM"
-	envAllowUnsafe         = "TREEDB_BENCH_ALLOW_UNSAFE"
-	envMode                = "TREEDB_BENCH_MODE"
-	envPinSnapshot         = "TREEDB_BENCH_PIN_SNAPSHOT"
-	envReuseReads          = "TREEDB_BENCH_REUSE_READS"
-	envSplitValueLog       = "TREEDB_BENCH_SPLIT_VALUE_LOG"
+	envDisableWAL                    = "TREEDB_BENCH_DISABLE_WAL"
+	envDisableBG                     = "TREEDB_BENCH_DISABLE_BG"
+	envRelaxedSync                   = "TREEDB_BENCH_RELAXED_SYNC"
+	envDisableValueLog               = "TREEDB_BENCH_DISABLE_VALUE_LOG"
+	envDisableReadChecksum           = "TREEDB_BENCH_DISABLE_READ_CHECKSUM"
+	envAllowUnsafe                   = "TREEDB_BENCH_ALLOW_UNSAFE"
+	envMode                          = "TREEDB_BENCH_MODE"
+	envPinSnapshot                   = "TREEDB_BENCH_PIN_SNAPSHOT"
+	envReuseReads                    = "TREEDB_BENCH_REUSE_READS"
+	envSplitValueLog                 = "TREEDB_BENCH_SPLIT_VALUE_LOG"
+	envBGCompactionInterval          = "TREEDB_BENCH_BG_COMPACTION_INTERVAL"
+	envBGCompactionIndexSwap         = "TREEDB_BENCH_BG_COMPACTION_INDEX_SWAP"
+	envBGCompactionRotateBeforeWrite = "TREEDB_BENCH_BG_COMPACTION_ROTATE_BEFORE_WRITE"
+	envBGCompactionCopyBytesPerSec   = "TREEDB_BENCH_BG_COMPACTION_COPY_BYTES_PER_SEC"
+	envBGCompactionCopyBurstBytes    = "TREEDB_BENCH_BG_COMPACTION_COPY_BURST_BYTES"
 )
 
 func init() {
@@ -99,6 +104,24 @@ func envInt64(name string, defaultValue int64) int64 {
 	return n
 }
 
+func envDuration(name string, defaultValue time.Duration) time.Duration {
+	v, ok := os.LookupEnv(name)
+	if !ok {
+		return defaultValue
+	}
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return defaultValue
+	}
+	if d, err := time.ParseDuration(v); err == nil {
+		return d
+	}
+	if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return time.Duration(n) * time.Second
+	}
+	return defaultValue
+}
+
 func envString(name string, defaultValue string) string {
 	v, ok := os.LookupEnv(name)
 	if !ok {
@@ -140,6 +163,12 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 	relaxedSync := envBool(envRelaxedSync, true)
 	disableValueLog := envBool(envDisableValueLog, false)
 	splitValueLog := envBool(envSplitValueLog, false)
+	bgCompactionInterval := envDuration(envBGCompactionInterval, 0)
+	bgCompactionIndexSwap := envBool(envBGCompactionIndexSwap, false)
+	bgCompactionRotateBeforeWrite := envBool(envBGCompactionRotateBeforeWrite, false)
+	bgCompactionCopyBytesPerSec := envInt64(envBGCompactionCopyBytesPerSec, 0)
+	bgCompactionCopyBurstBytes := envInt64(envBGCompactionCopyBurstBytes, 0)
+
 	disableReadChecksum := envBool(envDisableReadChecksum, true)
 	_, allowUnsafeSet := os.LookupEnv(envAllowUnsafe)
 	allowUnsafe := envBool(envAllowUnsafe, false)
@@ -171,9 +200,14 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		FlushBuildConcurrency: 4,
 		ChunkSize:             64 * 1024 * 1024,
 
-		PreferAppendAlloc:             false,
-		KeepRecent:                    1,
-		BackgroundIndexVacuumInterval: 15 * time.Second,
+		PreferAppendAlloc:                     false,
+		KeepRecent:                            1,
+		BackgroundIndexVacuumInterval:         15 * time.Second,
+		BackgroundCompactionInterval:          bgCompactionInterval,
+		BackgroundCompactionIndexSwap:         bgCompactionIndexSwap,
+		BackgroundCompactionRotateBeforeWrite: bgCompactionRotateBeforeWrite,
+		BackgroundCompactionCopyBytesPerSec:   bgCompactionCopyBytesPerSec,
+		BackgroundCompactionCopyBurstBytes:    bgCompactionCopyBurstBytes,
 
 		// Add Value Log Compaction
 		//BackgroundCompactionInterval:  1 * time.Second,
@@ -185,6 +219,7 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		// Background tasks can dominate profile lock/wait time and obscure the
 		// hot path; disable them for tighter profiling loops.
 		openOpts.BackgroundIndexVacuumInterval = -1
+		openOpts.BackgroundCompactionInterval = -1
 		openOpts.BackgroundCheckpointInterval = -1
 		openOpts.MaxWALBytes = -1
 		openOpts.BackgroundCheckpointIdleDuration = -1

@@ -1,3 +1,6 @@
+//go:build gomap
+// +build gomap
+
 package db
 
 // gomapBatch is a simple in-memory batch applied to the underlying tree on Write.

@@ -1,3 +1,6 @@
+//go:build gomap
+// +build gomap
+
 package db
 
 import gbtree "github.com/snissn/gomap/btree"
