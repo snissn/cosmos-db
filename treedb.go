@@ -5,26 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
 	treedb "github.com/snissn/gomap/TreeDB"
 	"github.com/snissn/gomap/TreeDB/tree"
 	treedbadapter "github.com/snissn/gomap/kvstore/adapters/treedb"
-)
-
-const memtableMode = "adaptive"
-
-const (
-	envDisableWAL          = "TREEDB_BENCH_DISABLE_WAL"
-	envDisableBG           = "TREEDB_BENCH_DISABLE_BG"
-	envRelaxedSync         = "TREEDB_BENCH_RELAXED_SYNC"
-	envDisableValueLog     = "TREEDB_BENCH_DISABLE_VALUE_LOG"
-	envDisableReadChecksum = "TREEDB_BENCH_DISABLE_READ_CHECKSUM"
-	envMode                = "TREEDB_BENCH_MODE"
-	envPinSnapshot         = "TREEDB_BENCH_PIN_SNAPSHOT"
-	envReuseReads          = "TREEDB_BENCH_REUSE_READS"
 )
 
 func init() {
@@ -59,90 +43,9 @@ func (d *TreeDB) UnpinSnapshot() {
 	}
 }
 
-func envBool(name string, defaultValue bool) bool {
-	v, ok := os.LookupEnv(name)
-	if !ok {
-		return defaultValue
-	}
-	v = strings.TrimSpace(strings.ToLower(v))
-	if v == "" {
-		return true
-	}
-	switch v {
-	case "1", "true", "t", "yes", "y", "on":
-		return true
-	case "0", "false", "f", "no", "n", "off":
-		return false
-	}
-	if n, err := strconv.Atoi(v); err == nil {
-		return n != 0
-	}
-	return defaultValue
-}
-
-func envInt64(name string, defaultValue int64) int64 {
-	v, ok := os.LookupEnv(name)
-	if !ok {
-		return defaultValue
-	}
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return defaultValue
-	}
-	n, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
-		return defaultValue
-	}
-	return n
-}
-
-func envString(name string, defaultValue string) string {
-	v, ok := os.LookupEnv(name)
-	if !ok {
-		return defaultValue
-	}
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return defaultValue
-	}
-	return v
-}
-
 func NewTreeDB(name, dir string, opts Options) (*TreeDB, error) {
 	_ = opts
 	return NewTreeDBAdapter(dir, name)
-}
-
-func profileForMode(mode string, disableWAL, relaxedSync bool) (treedb.Profile, error) {
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case "", "cached", "default":
-		if disableWAL {
-			return treedb.ProfileFast, nil
-		}
-		if relaxedSync {
-			return treedb.ProfileWALOnFast, nil
-		}
-		return treedb.ProfileDurable, nil
-	case "fast":
-		return treedb.ProfileFast, nil
-	case "wal_on_fast", "wal-on-fast", "walonfast":
-		return treedb.ProfileWALOnFast, nil
-	case "durable":
-		return treedb.ProfileDurable, nil
-	case "bench":
-		return treedb.ProfileBench, nil
-	case "backend", "raw", "uncached":
-		// Legacy modes no longer exist; map to cached-mode profiles.
-		if disableWAL {
-			return treedb.ProfileFast, nil
-		}
-		if relaxedSync {
-			return treedb.ProfileWALOnFast, nil
-		}
-		return treedb.ProfileDurable, nil
-	default:
-		return "", fmt.Errorf("unsupported %s value %q", envMode, mode)
-	}
 }
 
 func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
@@ -151,51 +54,7 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		return nil, fmt.Errorf("error creating treedb directory: %w", err)
 	}
 
-	disableWAL := envBool(envDisableWAL, false)
-	disableBG := envBool(envDisableBG, false)
-	pinSnapshot := envBool(envPinSnapshot, false)
-	reuseReads := envBool(envReuseReads, false)
-	relaxedSync := envBool(envRelaxedSync, true)
-	disableValueLog := envBool(envDisableValueLog, false)
-	disableReadChecksum := envBool(envDisableReadChecksum, true)
-
-	mode := envString(envMode, "cached")
-	profile, err := profileForMode(mode, disableWAL, relaxedSync)
-	if err != nil {
-		return nil, err
-	}
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case "backend", "raw", "uncached":
-		fmt.Fprintf(os.Stderr, "cosmos-db/treedb: %s=%q is legacy; using cached profile %q\n", envMode, mode, profile)
-	}
-	if disableValueLog {
-		fmt.Fprintf(os.Stderr, "cosmos-db/treedb: %s is ignored (value log is persistent storage)\n", envDisableValueLog)
-	}
-
-	openOpts := treedb.OptionsFor(profile, dbPath)
-	openOpts.MemtableMode = memtableMode
-	openOpts.FlushThreshold = 64 * 1024 * 1024
-	openOpts.FlushBuildConcurrency = 4
-	openOpts.ChunkSize = 64 * 1024 * 1024
-	openOpts.PreferAppendAlloc = false
-	openOpts.KeepRecent = 1
-	openOpts.BackgroundIndexVacuumInterval = 15 * time.Second
-	if disableReadChecksum {
-		openOpts.ValueLog.ReadIntegrity = treedb.IntegritySkipChecksums
-	} else {
-		openOpts.ValueLog.ReadIntegrity = treedb.IntegrityVerify
-	}
-
-	if disableBG {
-		// Background tasks can dominate profile lock/wait time and obscure the
-		// hot path; disable them for tighter profiling loops.
-		openOpts.BackgroundIndexVacuumInterval = -1
-		openOpts.BackgroundCheckpointInterval = -1
-		openOpts.MaxWALBytes = -1
-		openOpts.BackgroundCheckpointIdleDuration = -1
-	}
-
-	tdb, err := treedb.Open(openOpts)
+	tdb, err := treedb.Open(treedb.OptionsFor(treedb.ProfileFast, dbPath))
 	if err != nil {
 		return nil, err
 	}
@@ -203,10 +62,7 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 	adapter := &TreeDB{
 		db:         tdb,
 		kv:         treedbadapter.Wrap(tdb),
-		reuseReads: reuseReads,
-	}
-	if pinSnapshot {
-		adapter.PinSnapshot()
+		reuseReads: false,
 	}
 	return adapter, nil
 }
