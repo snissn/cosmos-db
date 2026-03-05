@@ -1,6 +1,10 @@
 package db
 
-import "github.com/snissn/gomap/kvstore"
+import (
+	"bytes"
+
+	"github.com/snissn/gomap/kvstore"
+)
 
 type keyArena struct {
 	buf []byte
@@ -87,4 +91,214 @@ func (it *coreIterator) assertIsValid() {
 	if !it.Valid() {
 		panic("iterator is invalid")
 	}
+}
+
+type materializedReverseIterator struct {
+	start []byte
+	end   []byte
+	keys  [][]byte
+	vals  [][]byte
+	idx   int
+	err   error
+}
+
+func newMaterializedReverseIterator(start, end []byte, src kvstore.Iterator) (*materializedReverseIterator, error) {
+	defer src.Close()
+	keys := make([][]byte, 0, 128)
+	vals := make([][]byte, 0, 128)
+	for ; src.Valid(); src.Next() {
+		k := src.Key()
+		v := src.Value()
+		keys = append(keys, append([]byte(nil), k...))
+		vals = append(vals, append([]byte(nil), v...))
+	}
+	if err := src.Error(); err != nil {
+		return nil, err
+	}
+	return &materializedReverseIterator{
+		start: start,
+		end:   end,
+		keys:  keys,
+		vals:  vals,
+		idx:   len(keys) - 1,
+	}, nil
+}
+
+func (it *materializedReverseIterator) Domain() (start, end []byte) { return it.start, it.end }
+
+func (it *materializedReverseIterator) Valid() bool {
+	return it != nil && it.err == nil && it.idx >= 0 && it.idx < len(it.keys)
+}
+
+func (it *materializedReverseIterator) Next() {
+	it.assertIsValid()
+	it.idx--
+}
+
+func (it *materializedReverseIterator) Key() []byte {
+	it.assertIsValid()
+	return it.keys[it.idx]
+}
+
+func (it *materializedReverseIterator) Value() []byte {
+	it.assertIsValid()
+	return it.vals[it.idx]
+}
+
+func (it *materializedReverseIterator) Error() error { return it.err }
+
+func (it *materializedReverseIterator) Close() error {
+	if it == nil {
+		return nil
+	}
+	it.keys = nil
+	it.vals = nil
+	it.idx = -1
+	return nil
+}
+
+func (it *materializedReverseIterator) assertIsValid() {
+	if !it.Valid() {
+		panic("iterator is invalid")
+	}
+}
+
+// boundedKVIterator wraps a source iterator and enforces [start,end) bounds
+// locally. This is used as a safety fallback when backend bounded iteration
+// for IAVL version ranges yields false-empty results.
+type boundedKVIterator struct {
+	src   kvstore.Iterator
+	start []byte
+	end   []byte
+	valid bool
+}
+
+func newBoundedKVIterator(start, end []byte, src kvstore.Iterator) *boundedKVIterator {
+	it := &boundedKVIterator{
+		src:   src,
+		start: start,
+		end:   end,
+	}
+	it.seek()
+	return it
+}
+
+func (it *boundedKVIterator) Domain() (start, end []byte) { return it.start, it.end }
+
+func (it *boundedKVIterator) Valid() bool {
+	return it != nil && it.src != nil && it.valid && it.src.Valid()
+}
+
+func (it *boundedKVIterator) Next() {
+	it.assertIsValid()
+	it.src.Next()
+	it.seek()
+}
+
+func (it *boundedKVIterator) Key() []byte {
+	it.assertIsValid()
+	return it.src.Key()
+}
+
+func (it *boundedKVIterator) Value() []byte {
+	it.assertIsValid()
+	return it.src.Value()
+}
+
+func (it *boundedKVIterator) KeyCopy(dst []byte) []byte {
+	it.assertIsValid()
+	return it.src.KeyCopy(dst)
+}
+
+func (it *boundedKVIterator) ValueCopy(dst []byte) []byte {
+	it.assertIsValid()
+	return it.src.ValueCopy(dst)
+}
+
+func (it *boundedKVIterator) Error() error {
+	if it == nil || it.src == nil {
+		return nil
+	}
+	return it.src.Error()
+}
+
+func (it *boundedKVIterator) Close() error {
+	if it == nil || it.src == nil {
+		return nil
+	}
+	return it.src.Close()
+}
+
+func (it *boundedKVIterator) assertIsValid() {
+	if !it.Valid() {
+		panic("iterator is invalid")
+	}
+}
+
+func (it *boundedKVIterator) seek() {
+	it.valid = false
+	if it == nil || it.src == nil {
+		return
+	}
+	for it.src.Valid() {
+		key := it.src.Key()
+		if it.start != nil && bytes.Compare(key, it.start) < 0 {
+			it.src.Next()
+			continue
+		}
+		if it.end != nil && bytes.Compare(key, it.end) >= 0 {
+			return
+		}
+		it.valid = true
+		return
+	}
+}
+
+func (d *TreeDB) forwardIteratorWithIAVLFallback(start, end []byte) (kvstore.Iterator, error) {
+	it, err := d.kv.Iterator(start, end)
+	if err != nil {
+		return nil, err
+	}
+	if !isPrefixedIAVLVersionRange(start, end) {
+		return it, nil
+	}
+	if it.Valid() || it.Error() != nil {
+		return it, nil
+	}
+	_ = it.Close()
+
+	// Fallback: iterate from start with an open upper bound and enforce the
+	// original end bound locally.
+	alt, err := d.kv.Iterator(start, nil)
+	if err != nil {
+		return nil, err
+	}
+	bounded := newBoundedKVIterator(start, end, alt)
+	if bounded.Valid() || bounded.Error() != nil {
+		if treedbVisibilityOn() {
+			treedbVisibilityf(
+				"iter fallback iavl_range=true mode=open_end start=%x end=%x alt_valid=%t",
+				start, end, bounded.Valid(),
+			)
+		}
+		return bounded, nil
+	}
+
+	// If the backend's start bound is also pathological, fall back to prefix
+	// iteration and enforce both bounds locally.
+	prefix := start[:len(start)-9]
+	prefixEnd := cpIncr(prefix)
+	_ = bounded.Close()
+	alt2, err := d.kv.Iterator(prefix, prefixEnd)
+	if err != nil {
+		return nil, err
+	}
+	bounded2 := newBoundedKVIterator(start, end, alt2)
+	if treedbVisibilityOn() {
+		treedbVisibilityf(
+			"iter fallback iavl_range=true mode=prefix_scan start=%x end=%x alt_valid=%t",
+			start, end, bounded2.Valid(),
+		)
+	}
+	return bounded2, nil
 }
