@@ -3,6 +3,7 @@ package db_test
 import (
 	"bytes"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	db "github.com/cosmos/cosmos-db"
@@ -26,6 +27,16 @@ type cosmosDBWrapper struct {
 	db.DB
 }
 
+type downgradeWriteSyncDB struct {
+	db.DB
+	remaining int64
+}
+
+type downgradeWriteSyncBatch struct {
+	db.Batch
+	parent *downgradeWriteSyncDB
+}
+
 func (dbw *cosmosDBWrapper) Iterator(start, end []byte) (idbm.Iterator, error) {
 	return dbw.DB.Iterator(start, end)
 }
@@ -40,6 +51,21 @@ func (dbw *cosmosDBWrapper) NewBatch() idbm.Batch {
 
 func (dbw *cosmosDBWrapper) NewBatchWithSize(size int) idbm.Batch {
 	return dbw.DB.NewBatchWithSize(size)
+}
+
+func (d *downgradeWriteSyncDB) NewBatch() db.Batch {
+	return &downgradeWriteSyncBatch{Batch: d.DB.NewBatch(), parent: d}
+}
+
+func (d *downgradeWriteSyncDB) NewBatchWithSize(size int) db.Batch {
+	return &downgradeWriteSyncBatch{Batch: d.DB.NewBatchWithSize(size), parent: d}
+}
+
+func (b *downgradeWriteSyncBatch) WriteSync() error {
+	if b.parent != nil && atomic.AddInt64(&b.parent.remaining, -1) >= 0 {
+		return b.Batch.Write()
+	}
+	return b.Batch.WriteSync()
 }
 
 func runWithBackendVisibilityEnv(t *testing.T, tc backendVisibilityCase, fn func()) {
@@ -169,6 +195,73 @@ func TestBackendImporterLoadVersionParity(t *testing.T) {
 				require.NoError(t, database.Close())
 				database = nil
 				database = openImporterBackendDB(t, tc, name, dir)
+
+				reopened := iavl.NewMutableTree(&cosmosDBWrapper{DB: db.NewPrefixDB(database, prefix)}, 0, false, iavl.NewNopLogger())
+				loaded, err = reopened.LoadVersion(importVersion)
+				require.NoError(t, err)
+				require.Equal(t, importVersion, loaded)
+
+				for _, key := range sampleKeys {
+					got, err := reopened.Get(key)
+					require.NoError(t, err)
+					require.True(t, bytes.Equal(sampleValues[string(key)], got), "reopen key mismatch")
+				}
+			})
+		})
+	}
+}
+
+func TestBackendImporterIntermediateWriteParity(t *testing.T) {
+	const importVersion = int64(1)
+	const treeSize = 10000*2 + 257
+	sourceTree, sampleKeys, sampleValues := buildIAVLExportTreeWithSamples(t, treeSize)
+	exported := exportIAVLNodes(t, sourceTree)
+
+	cases := []backendVisibilityCase{
+		{name: "goleveldb", backend: db.GoLevelDBBackend},
+		{name: "treedb_fast", backend: db.TreeDBBackend, profile: "fast"},
+		{name: "treedb_wal_on_fast", backend: db.TreeDBBackend, profile: "wal_on_fast"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runWithBackendVisibilityEnv(t, tc, func() {
+				name := "testdb"
+				dir := t.TempDir()
+				base := openImporterBackendDB(t, tc, name, dir)
+				t.Cleanup(func() {
+					if base != nil {
+						require.NoError(t, base.Close())
+					}
+				})
+
+				database := &downgradeWriteSyncDB{DB: base, remaining: 2}
+				prefix := []byte("s/k:staking/")
+				importDB := db.NewPrefixDB(database, prefix)
+				tree := iavl.NewMutableTree(&cosmosDBWrapper{DB: importDB}, 0, false, iavl.NewNopLogger())
+				importer, err := tree.Import(importVersion)
+				require.NoError(t, err)
+				for _, node := range exported {
+					require.NoError(t, importer.Add(node))
+				}
+				require.NoError(t, importer.Commit())
+				importer.Close()
+
+				fresh := iavl.NewMutableTree(&cosmosDBWrapper{DB: db.NewPrefixDB(database, prefix)}, 0, false, iavl.NewNopLogger())
+				loaded, err := fresh.LoadVersion(importVersion)
+				require.NoError(t, err)
+				require.Equal(t, importVersion, loaded)
+
+				for _, key := range sampleKeys {
+					got, err := fresh.Get(key)
+					require.NoError(t, err)
+					require.True(t, bytes.Equal(sampleValues[string(key)], got), "same-handle key mismatch")
+				}
+
+				require.NoError(t, base.Close())
+				base = nil
+				base = openImporterBackendDB(t, tc, name, dir)
+				database = &downgradeWriteSyncDB{DB: base}
 
 				reopened := iavl.NewMutableTree(&cosmosDBWrapper{DB: db.NewPrefixDB(database, prefix)}, 0, false, iavl.NewNopLogger())
 				loaded, err = reopened.LoadVersion(importVersion)
