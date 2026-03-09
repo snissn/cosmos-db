@@ -27,6 +27,16 @@ type cosmosDBWrapper struct {
 	db.DB
 }
 
+type countingWriteSyncDB struct {
+	db.DB
+	count *int64
+}
+
+type countingWriteSyncBatch struct {
+	db.Batch
+	parent *countingWriteSyncDB
+}
+
 type downgradeWriteSyncDB struct {
 	db.DB
 	remaining int64
@@ -51,6 +61,21 @@ func (dbw *cosmosDBWrapper) NewBatch() idbm.Batch {
 
 func (dbw *cosmosDBWrapper) NewBatchWithSize(size int) idbm.Batch {
 	return dbw.DB.NewBatchWithSize(size)
+}
+
+func (d *countingWriteSyncDB) NewBatch() db.Batch {
+	return &countingWriteSyncBatch{Batch: d.DB.NewBatch(), parent: d}
+}
+
+func (d *countingWriteSyncDB) NewBatchWithSize(size int) db.Batch {
+	return &countingWriteSyncBatch{Batch: d.DB.NewBatchWithSize(size), parent: d}
+}
+
+func (b *countingWriteSyncBatch) WriteSync() error {
+	if b.parent != nil && b.parent.count != nil {
+		atomic.AddInt64(b.parent.count, 1)
+	}
+	return b.Batch.WriteSync()
 }
 
 func (d *downgradeWriteSyncDB) NewBatch() db.Batch {
@@ -226,17 +251,33 @@ func TestBackendImporterIntermediateWriteParity(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			runWithBackendVisibilityEnv(t, tc, func() {
-				name := "testdb"
 				dir := t.TempDir()
+				var syncCalls int64
+
+				countName := "countdb"
+				countBase := openImporterBackendDB(t, tc, countName, dir)
+				counting := &countingWriteSyncDB{DB: countBase, count: &syncCalls}
+				prefix := []byte("s/k:staking/")
+				countTree := iavl.NewMutableTree(&cosmosDBWrapper{DB: db.NewPrefixDB(counting, prefix)}, 0, false, iavl.NewNopLogger())
+				countImporter, err := countTree.Import(importVersion)
+				require.NoError(t, err)
+				for _, node := range exported {
+					require.NoError(t, countImporter.Add(node))
+				}
+				require.NoError(t, countImporter.Commit())
+				countImporter.Close()
+				require.Greater(t, syncCalls, int64(0), "importer should issue at least one WriteSync")
+				require.NoError(t, countBase.Close())
+				countBase = nil
+
+				name := "testdb"
 				base := openImporterBackendDB(t, tc, name, dir)
 				t.Cleanup(func() {
 					if base != nil {
 						require.NoError(t, base.Close())
 					}
 				})
-
-				database := &downgradeWriteSyncDB{DB: base, remaining: 2}
-				prefix := []byte("s/k:staking/")
+				database := &downgradeWriteSyncDB{DB: base, remaining: syncCalls - 1}
 				importDB := db.NewPrefixDB(database, prefix)
 				tree := iavl.NewMutableTree(&cosmosDBWrapper{DB: importDB}, 0, false, iavl.NewNopLogger())
 				importer, err := tree.Import(importVersion)
@@ -272,6 +313,94 @@ func TestBackendImporterIntermediateWriteParity(t *testing.T) {
 					got, err := reopened.Get(key)
 					require.NoError(t, err)
 					require.True(t, bytes.Equal(sampleValues[string(key)], got), "reopen key mismatch")
+				}
+			})
+		})
+	}
+}
+
+func TestBackendMultiStoreImporterIntermediateWriteParity(t *testing.T) {
+	const importVersion = int64(1)
+	const treeSize = 10000*2 + 257
+	sourceTree, sampleKeys, sampleValues := buildIAVLExportTreeWithSamples(t, treeSize)
+	exported := exportIAVLNodes(t, sourceTree)
+	stores := []string{"acc", "authz", "bank", "distribution", "gov", "staking", "transfer", "upgrade"}
+
+	cases := []backendVisibilityCase{
+		{name: "goleveldb", backend: db.GoLevelDBBackend},
+		{name: "treedb_fast", backend: db.TreeDBBackend, profile: "fast"},
+		{name: "treedb_wal_on_fast", backend: db.TreeDBBackend, profile: "wal_on_fast"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runWithBackendVisibilityEnv(t, tc, func() {
+				dir := t.TempDir()
+				var syncCalls int64
+
+				countName := "countdb"
+				countBase := openImporterBackendDB(t, tc, countName, dir)
+				counting := &countingWriteSyncDB{DB: countBase, count: &syncCalls}
+				countTree := iavl.NewMutableTree(&cosmosDBWrapper{DB: db.NewPrefixDB(counting, []byte("s/k:count/"))}, 0, false, iavl.NewNopLogger())
+				countImporter, err := countTree.Import(importVersion)
+				require.NoError(t, err)
+				for _, node := range exported {
+					require.NoError(t, countImporter.Add(node))
+				}
+				require.NoError(t, countImporter.Commit())
+				countImporter.Close()
+				require.Greater(t, syncCalls, int64(0))
+				require.NoError(t, countBase.Close())
+
+				name := "testdb"
+				base := openImporterBackendDB(t, tc, name, dir)
+				t.Cleanup(func() {
+					if base != nil {
+						require.NoError(t, base.Close())
+					}
+				})
+
+				for _, storeName := range stores {
+					wrapped := &downgradeWriteSyncDB{DB: base, remaining: syncCalls - 1}
+					prefix := []byte("s/k:" + storeName + "/")
+					tree := iavl.NewMutableTree(&cosmosDBWrapper{DB: db.NewPrefixDB(wrapped, prefix)}, 0, false, iavl.NewNopLogger())
+					importer, err := tree.Import(importVersion)
+					require.NoError(t, err, "store=%s import", storeName)
+					for _, node := range exported {
+						require.NoError(t, importer.Add(node), "store=%s add", storeName)
+					}
+					require.NoError(t, importer.Commit(), "store=%s commit", storeName)
+					importer.Close()
+				}
+
+				for _, storeName := range stores {
+					prefix := []byte("s/k:" + storeName + "/")
+					fresh := iavl.NewMutableTree(&cosmosDBWrapper{DB: db.NewPrefixDB(base, prefix)}, 0, false, iavl.NewNopLogger())
+					loaded, err := fresh.LoadVersion(importVersion)
+					require.NoError(t, err, "same-handle load store=%s", storeName)
+					require.Equal(t, importVersion, loaded)
+					for _, key := range sampleKeys {
+						got, err := fresh.Get(key)
+						require.NoError(t, err, "same-handle get store=%s", storeName)
+						require.True(t, bytes.Equal(sampleValues[string(key)], got), "same-handle key mismatch store=%s", storeName)
+					}
+				}
+
+				require.NoError(t, base.Close())
+				base = nil
+				base = openImporterBackendDB(t, tc, name, dir)
+
+				for _, storeName := range stores {
+					prefix := []byte("s/k:" + storeName + "/")
+					reopened := iavl.NewMutableTree(&cosmosDBWrapper{DB: db.NewPrefixDB(base, prefix)}, 0, false, iavl.NewNopLogger())
+					loaded, err := reopened.LoadVersion(importVersion)
+					require.NoError(t, err, "reopen load store=%s", storeName)
+					require.Equal(t, importVersion, loaded)
+					for _, key := range sampleKeys {
+						got, err := reopened.Get(key)
+						require.NoError(t, err, "reopen get store=%s", storeName)
+						require.True(t, bytes.Equal(sampleValues[string(key)], got), "reopen key mismatch store=%s", storeName)
+					}
 				}
 			})
 		})
