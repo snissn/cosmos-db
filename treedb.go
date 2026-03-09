@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
 
 	treedb "github.com/snissn/gomap/TreeDB"
 	"github.com/snissn/gomap/TreeDB/tree"
@@ -20,27 +23,109 @@ func init() {
 
 // TreeDB is a TreeDB backend.
 type TreeDB struct {
-	db         *treedb.DB
-	kv         *treedbadapter.DB
-	snap       *treedb.Snapshot
-	reuseReads bool
-	readBuf    []byte
+	db                     *treedb.DB
+	kv                     *treedbadapter.DB
+	reuseReads             bool
+	readBuf                []byte
+	forceCheckpointOnWrite bool
+	batchWriteMu           sync.Mutex
 }
 
 var _ DB = (*TreeDB)(nil)
 
-func (d *TreeDB) PinSnapshot() {
-	if d.snap != nil {
-		d.snap.Close()
+const envTreeDBForceCheckpointOnWrite = "TREEDB_FORCE_CHECKPOINT_ON_WRITE"
+const envTreeDBOpenProfile = "TREEDB_OPEN_PROFILE"
+const envTreeDBAllowNonRouteMode = "TREEDB_ALLOW_NON_ROUTE_MODE"
+const envTreeDBRequiredOuterLeafMode = "TREEDB_REQUIRED_OUTER_LEAF_MODE"
+const envTreeDBKeepRecent = "TREEDB_KEEP_RECENT"
+const envTreeDBMemtableMode = "TREEDB_MEMTABLE_MODE"
+
+func forceCheckpointOnWriteFromEnv() bool {
+	raw, ok := os.LookupEnv(envTreeDBForceCheckpointOnWrite)
+	if !ok {
+		return false
 	}
-	d.snap = d.db.AcquireSnapshot()
+	on, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false
+	}
+	return on
 }
 
-func (d *TreeDB) UnpinSnapshot() {
-	if d.snap != nil {
-		d.snap.Close()
-		d.snap = nil
+func treeDBProfileFromEnv() treedb.Profile {
+	raw, ok := os.LookupEnv(envTreeDBOpenProfile)
+	if !ok {
+		return treedb.ProfileWALOnFast
 	}
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "fast":
+		return treedb.ProfileFast
+	case "wal_on_fast", "walonfast":
+		return treedb.ProfileWALOnFast
+	case "durable":
+		return treedb.ProfileDurable
+	case "bench":
+		return treedb.ProfileBench
+	default:
+		return treedb.ProfileWALOnFast
+	}
+}
+
+func treeDBMemtableModeFromEnv(defaultValue string) string {
+	raw := strings.TrimSpace(os.Getenv(envTreeDBMemtableMode))
+	if raw == "" {
+		return defaultValue
+	}
+	return strings.ToLower(raw)
+}
+
+func (d *TreeDB) maybeCheckpointAfterWrite() error {
+	if d == nil || !d.forceCheckpointOnWrite || d.kv == nil {
+		return nil
+	}
+	return d.kv.Checkpoint()
+}
+
+func (d *TreeDB) writeSyncBarrier() error {
+	if d == nil || d.db == nil {
+		return treedb.ErrClosed
+	}
+	if treedbVisibilityOn() && d.kv != nil {
+		stats := d.kv.Stats()
+		treedbVisibilityf(
+			"barrier pre checkpoint queue_len=%s queue_backlog=%s mutable_bytes=%s",
+			stats["treedb.cache.queue_len"],
+			stats["treedb.cache.queue_backlog_bytes"],
+			stats["treedb.cache.mutable_bytes"],
+		)
+	}
+	// IAVL restore/load paths depend on versioned root-key visibility immediately
+	// after Batch.WriteSync boundaries. Keep a strict backend visibility barrier
+	// here; lightweight flush has shown missing-version failures under restore.
+	if d.kv != nil {
+		err := d.kv.Checkpoint()
+		if treedbVisibilityOn() {
+			stats := d.kv.Stats()
+			treedbVisibilityf(
+				"barrier post checkpoint err=%v queue_len=%s queue_backlog=%s mutable_bytes=%s",
+				err,
+				stats["treedb.cache.queue_len"],
+				stats["treedb.cache.queue_backlog_bytes"],
+				stats["treedb.cache.mutable_bytes"],
+			)
+		}
+		return err
+	}
+	return d.db.Checkpoint()
+}
+
+func (d *TreeDB) withSerializedBatchWrite(fn func() error) error {
+	if d == nil || d.kv == nil {
+		return treedb.ErrClosed
+	}
+	d.batchWriteMu.Lock()
+	defer d.batchWriteMu.Unlock()
+	return fn()
 }
 
 func NewTreeDB(name, dir string, opts Options) (*TreeDB, error) {
@@ -54,15 +139,35 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		return nil, fmt.Errorf("error creating treedb directory: %w", err)
 	}
 
-	tdb, err := treedb.Open(treedb.OptionsFor(treedb.ProfileFast, dbPath))
+	profile := treeDBProfileFromEnv()
+	openOpts := treedb.OptionsFor(profile, dbPath)
+	// Keep a stable recent-version window for IAVL restore/load paths.
+	openOpts.KeepRecent = 1
+	// Keep ForcePointers/pointer thresholds from the selected profile.
+	// Keep default pointer thresholds from the selected profile unless callers
+	// explicitly tune them in TreeDB itself.
+	//
+	// Allow integration-level memtable selection for restore experiments:
+	// adaptive | skiplist | hash_sorted | btree | append_only.
+	defaultMemtableMode := strings.TrimSpace(openOpts.MemtableMode)
+	if defaultMemtableMode == "" || strings.EqualFold(defaultMemtableMode, "adaptive") {
+		// Avoid append-only warmup as the default baseline for restore-heavy flows.
+		// Keep adaptive switching enabled, but start from hash_sorted.
+		defaultMemtableMode = "adaptive:hash_sorted"
+	}
+	openOpts.MemtableMode = treeDBMemtableModeFromEnv(defaultMemtableMode)
+	// Keep background maintenance defaults from the selected profile.
+
+	tdb, err := treedb.Open(openOpts)
 	if err != nil {
 		return nil, err
 	}
 
 	adapter := &TreeDB{
-		db:         tdb,
-		kv:         treedbadapter.Wrap(tdb),
-		reuseReads: false,
+		db:                     tdb,
+		kv:                     treedbadapter.Wrap(tdb),
+		reuseReads:             false,
+		forceCheckpointOnWrite: forceCheckpointOnWriteFromEnv(),
 	}
 	return adapter, nil
 }
@@ -72,21 +177,17 @@ func (d *TreeDB) Get(key []byte) ([]byte, error) {
 	if len(key) == 0 {
 		return nil, errKeyEmpty
 	}
-	if d.snap != nil {
-		val, err := d.snap.GetUnsafe(key)
-		if err != nil {
-			if errors.Is(err, tree.ErrKeyNotFound) {
-				return nil, nil
-			}
-			return nil, err
-		}
-		return val, nil
-	}
 	if d.db == nil {
 		return nil, treedb.ErrClosed
 	}
 	if d.reuseReads {
 		val, err := d.db.GetAppend(key, d.readBuf[:0])
+		if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
+			treedbVisibilityf("get source=getappend prefix=%q key=%x version=%d val_nil=%t val_len=%d err=%v", prefix, key, version, val == nil, len(val), err)
+		}
+		if isRootMultiMetaKey(key) {
+			treedbVisibilityf("get-meta source=getappend key=%q val_nil=%t val_len=%d err=%v", key, val == nil, len(val), err)
+		}
 		if err != nil {
 			if errors.Is(err, tree.ErrKeyNotFound) {
 				return nil, nil
@@ -96,7 +197,14 @@ func (d *TreeDB) Get(key []byte) ([]byte, error) {
 		d.readBuf = val[:0]
 		return val, nil
 	}
-	return d.kv.GetUnsafe(key)
+	val, err := d.kv.GetUnsafe(key)
+	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
+		treedbVisibilityf("get source=kv prefix=%q key=%x version=%d val_nil=%t val_len=%d err=%v", prefix, key, version, val == nil, len(val), err)
+	}
+	if isRootMultiMetaKey(key) {
+		treedbVisibilityf("get-meta source=kv key=%q val_nil=%t val_len=%d err=%v", key, val == nil, len(val), err)
+	}
+	return val, err
 }
 
 // Has implements DB.
@@ -104,13 +212,17 @@ func (d *TreeDB) Has(key []byte) (bool, error) {
 	if len(key) == 0 {
 		return false, errKeyEmpty
 	}
-	if d.snap != nil {
-		return d.snap.Has(key)
-	}
 	if d.kv == nil {
 		return false, treedb.ErrClosed
 	}
-	return d.kv.Has(key)
+	ok, err := d.kv.Has(key)
+	if version, prefix, match := prefixedIAVLRootVersion(key); match {
+		treedbVisibilityf("has source=kv prefix=%q key=%x version=%d ok=%t err=%v", prefix, key, version, ok, err)
+	}
+	if isRootMultiMetaKey(key) {
+		treedbVisibilityf("has-meta source=kv key=%q ok=%t err=%v", key, ok, err)
+	}
+	return ok, err
 }
 
 // Set implements DB.
@@ -124,7 +236,13 @@ func (d *TreeDB) Set(key, value []byte) error {
 	if d.kv == nil {
 		return treedb.ErrClosed
 	}
-	return d.kv.Set(key, value)
+	if err := d.kv.Set(key, value); err != nil {
+		return err
+	}
+	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
+		treedbVisibilityf("set prefix=%q key=%x version=%d val_len=%d", prefix, key, version, len(value))
+	}
+	return d.maybeCheckpointAfterWrite()
 }
 
 // SetSync implements DB.
@@ -138,7 +256,13 @@ func (d *TreeDB) SetSync(key, value []byte) error {
 	if d.kv == nil {
 		return treedb.ErrClosed
 	}
-	return d.kv.SetSync(key, value)
+	if err := d.kv.SetSync(key, value); err != nil {
+		return err
+	}
+	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
+		treedbVisibilityf("setsync prefix=%q key=%x version=%d val_len=%d", prefix, key, version, len(value))
+	}
+	return d.maybeCheckpointAfterWrite()
 }
 
 // Delete implements DB.
@@ -149,7 +273,13 @@ func (d *TreeDB) Delete(key []byte) error {
 	if d.kv == nil {
 		return treedb.ErrClosed
 	}
-	return d.kv.Delete(key)
+	if err := d.kv.Delete(key); err != nil {
+		return err
+	}
+	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
+		treedbVisibilityf("delete prefix=%q key=%x version=%d", prefix, key, version)
+	}
+	return d.maybeCheckpointAfterWrite()
 }
 
 // DeleteSync implements DB.
@@ -160,7 +290,13 @@ func (d *TreeDB) DeleteSync(key []byte) error {
 	if d.kv == nil {
 		return treedb.ErrClosed
 	}
-	return d.kv.DeleteSync(key)
+	if err := d.kv.DeleteSync(key); err != nil {
+		return err
+	}
+	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
+		treedbVisibilityf("deletesync prefix=%q key=%x version=%d", prefix, key, version)
+	}
+	return d.maybeCheckpointAfterWrite()
 }
 
 // Iterator implements DB.
@@ -171,7 +307,7 @@ func (d *TreeDB) Iterator(start, end []byte) (Iterator, error) {
 	if d.kv == nil {
 		return nil, treedb.ErrClosed
 	}
-	it, err := d.kv.Iterator(start, end)
+	it, err := d.forwardIteratorWithIAVLFallback(start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +334,6 @@ func (d *TreeDB) Close() error {
 	if d.db == nil {
 		return nil
 	}
-	d.UnpinSnapshot()
 	err := d.db.Close()
 	d.db = nil
 	d.kv = nil
@@ -220,12 +355,6 @@ func (d *TreeDB) NewBatchWithSize(size int) Batch {
 		kb, err := d.kv.NewBatch()
 		if err == nil {
 			b.kb = kb
-			if sv, ok := kb.(interface{ SetView(key, value []byte) error }); ok {
-				b.setView = sv.SetView
-			}
-			if dv, ok := kb.(interface{ DeleteView(key []byte) error }); ok {
-				b.deleteView = dv.DeleteView
-			}
 		}
 	}
 	return b
