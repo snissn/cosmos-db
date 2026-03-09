@@ -25,7 +25,6 @@ func init() {
 type TreeDB struct {
 	db                     *treedb.DB
 	kv                     *treedbadapter.DB
-	snap                   treedb.Snapshot
 	reuseReads             bool
 	readBuf                []byte
 	forceCheckpointOnWrite bool
@@ -40,26 +39,6 @@ const envTreeDBAllowNonRouteMode = "TREEDB_ALLOW_NON_ROUTE_MODE"
 const envTreeDBRequiredOuterLeafMode = "TREEDB_REQUIRED_OUTER_LEAF_MODE"
 const envTreeDBKeepRecent = "TREEDB_KEEP_RECENT"
 const envTreeDBMemtableMode = "TREEDB_MEMTABLE_MODE"
-
-func (d *TreeDB) PinSnapshot() {
-	if d.snap != nil {
-		d.snap.Close()
-	}
-	// In cached mode, AcquireSnapshot is backend-only. If we are prioritizing
-	// correctness (e.g. IAVL restore), force a backend visibility barrier first
-	// so snapshot reads cannot miss recently-written queued/memtable state.
-	if d.forceCheckpointOnWrite && d.kv != nil {
-		_ = d.kv.Checkpoint()
-	}
-	d.snap = d.db.AcquireSnapshot()
-}
-
-func (d *TreeDB) UnpinSnapshot() {
-	if d.snap != nil {
-		d.snap.Close()
-		d.snap = nil
-	}
-}
 
 func forceCheckpointOnWriteFromEnv() bool {
 	raw, ok := os.LookupEnv(envTreeDBForceCheckpointOnWrite)
@@ -198,22 +177,6 @@ func (d *TreeDB) Get(key []byte) ([]byte, error) {
 	if len(key) == 0 {
 		return nil, errKeyEmpty
 	}
-	if d.snap != nil {
-		val, err := d.snap.GetUnsafe(key)
-		if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
-			treedbVisibilityf("get source=snapshot prefix=%q key=%x version=%d val_nil=%t val_len=%d err=%v", prefix, key, version, val == nil, len(val), err)
-		}
-		if isRootMultiMetaKey(key) {
-			treedbVisibilityf("get-meta source=snapshot key=%q val_nil=%t val_len=%d err=%v", key, val == nil, len(val), err)
-		}
-		if err != nil {
-			if errors.Is(err, tree.ErrKeyNotFound) {
-				return nil, nil
-			}
-			return nil, err
-		}
-		return val, nil
-	}
 	if d.db == nil {
 		return nil, treedb.ErrClosed
 	}
@@ -248,16 +211,6 @@ func (d *TreeDB) Get(key []byte) ([]byte, error) {
 func (d *TreeDB) Has(key []byte) (bool, error) {
 	if len(key) == 0 {
 		return false, errKeyEmpty
-	}
-	if d.snap != nil {
-		ok, err := d.snap.Has(key)
-		if version, prefix, match := prefixedIAVLRootVersion(key); match {
-			treedbVisibilityf("has source=snapshot prefix=%q key=%x version=%d ok=%t err=%v", prefix, key, version, ok, err)
-		}
-		if isRootMultiMetaKey(key) {
-			treedbVisibilityf("has-meta source=snapshot key=%q ok=%t err=%v", key, ok, err)
-		}
-		return ok, err
 	}
 	if d.kv == nil {
 		return false, treedb.ErrClosed
@@ -381,7 +334,6 @@ func (d *TreeDB) Close() error {
 	if d.db == nil {
 		return nil
 	}
-	d.UnpinSnapshot()
 	err := d.db.Close()
 	d.db = nil
 	d.kv = nil
