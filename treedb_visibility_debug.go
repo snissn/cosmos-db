@@ -42,6 +42,25 @@ func treedbVisibilityf(format string, args ...any) {
 	treedbVisibilityMu.Unlock()
 }
 
+func treedbVisibilityTrackKey(key []byte) bool {
+	if !treedbVisibilityOn() {
+		return false
+	}
+	if len(key) == 0 {
+		return false
+	}
+	if isRootMultiMetaKey(key) {
+		return true
+	}
+	if _, _, ok := prefixedIAVLRootVersion(key); ok {
+		return true
+	}
+	if treedbVisibilityPrefix == "" {
+		return false
+	}
+	return bytes.HasPrefix(key, []byte(treedbVisibilityPrefix))
+}
+
 // prefixedIAVLRootVersion returns the parsed root version for a key that ends
 // with IAVL root node-key format: 's' + 8-byte version + 4-byte nonce(=1).
 func prefixedIAVLRootVersion(key []byte) (version uint64, prefix []byte, ok bool) {

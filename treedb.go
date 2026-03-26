@@ -200,6 +200,9 @@ func (d *TreeDB) Get(key []byte) ([]byte, error) {
 	}
 	if d.snap != nil {
 		val, err := d.snap.GetUnsafe(key)
+		if treedbVisibilityTrackKey(key) {
+			treedbVisibilityf("get source=snapshot key=%x val_nil=%t val_len=%d err=%v", key, val == nil, len(val), err)
+		}
 		if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
 			treedbVisibilityf("get source=snapshot prefix=%q key=%x version=%d val_nil=%t val_len=%d err=%v", prefix, key, version, val == nil, len(val), err)
 		}
@@ -219,6 +222,9 @@ func (d *TreeDB) Get(key []byte) ([]byte, error) {
 	}
 	if d.reuseReads {
 		val, err := d.db.GetAppend(key, d.readBuf[:0])
+		if treedbVisibilityTrackKey(key) {
+			treedbVisibilityf("get source=getappend key=%x val_nil=%t val_len=%d err=%v", key, val == nil, len(val), err)
+		}
 		if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
 			treedbVisibilityf("get source=getappend prefix=%q key=%x version=%d val_nil=%t val_len=%d err=%v", prefix, key, version, val == nil, len(val), err)
 		}
@@ -235,6 +241,9 @@ func (d *TreeDB) Get(key []byte) ([]byte, error) {
 		return val, nil
 	}
 	val, err := d.kv.GetUnsafe(key)
+	if treedbVisibilityTrackKey(key) {
+		treedbVisibilityf("get source=kv key=%x val_nil=%t val_len=%d err=%v", key, val == nil, len(val), err)
+	}
 	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
 		treedbVisibilityf("get source=kv prefix=%q key=%x version=%d val_nil=%t val_len=%d err=%v", prefix, key, version, val == nil, len(val), err)
 	}
@@ -244,6 +253,35 @@ func (d *TreeDB) Get(key []byte) ([]byte, error) {
 	return val, err
 }
 
+// GetAppend fetches the value of the given key into dst when supported.
+// Missing keys return (nil, nil) to match DB.Get semantics.
+func (d *TreeDB) GetAppend(key, dst []byte) ([]byte, error) {
+	if len(key) == 0 {
+		return nil, errKeyEmpty
+	}
+	if d.snap != nil {
+		val, err := d.snap.GetAppend(key, dst)
+		if err != nil {
+			if errors.Is(err, tree.ErrKeyNotFound) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		return val, nil
+	}
+	if d.db == nil {
+		return nil, treedb.ErrClosed
+	}
+	val, err := d.db.GetAppend(key, dst)
+	if err != nil {
+		if errors.Is(err, tree.ErrKeyNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return val, nil
+}
+
 // Has implements DB.
 func (d *TreeDB) Has(key []byte) (bool, error) {
 	if len(key) == 0 {
@@ -251,6 +289,9 @@ func (d *TreeDB) Has(key []byte) (bool, error) {
 	}
 	if d.snap != nil {
 		ok, err := d.snap.Has(key)
+		if treedbVisibilityTrackKey(key) {
+			treedbVisibilityf("has source=snapshot key=%x ok=%t err=%v", key, ok, err)
+		}
 		if version, prefix, match := prefixedIAVLRootVersion(key); match {
 			treedbVisibilityf("has source=snapshot prefix=%q key=%x version=%d ok=%t err=%v", prefix, key, version, ok, err)
 		}
@@ -263,6 +304,9 @@ func (d *TreeDB) Has(key []byte) (bool, error) {
 		return false, treedb.ErrClosed
 	}
 	ok, err := d.kv.Has(key)
+	if treedbVisibilityTrackKey(key) {
+		treedbVisibilityf("has source=kv key=%x ok=%t err=%v", key, ok, err)
+	}
 	if version, prefix, match := prefixedIAVLRootVersion(key); match {
 		treedbVisibilityf("has source=kv prefix=%q key=%x version=%d ok=%t err=%v", prefix, key, version, ok, err)
 	}
