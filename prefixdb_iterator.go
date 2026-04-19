@@ -44,23 +44,17 @@ func newPrefixIterator(prefix, start, end []byte, source Iterator) (*prefixDBIte
 		valid:  false,
 	}
 
-	// Empty keys are not allowed, so if a key exists in the database that exactly matches the
-	// prefix we need to skip it.
-	if source.Valid() && bytes.Equal(source.Key(), prefix) {
-		source.Next()
-	}
-
-	if !source.Valid() || !bytes.HasPrefix(source.Key(), prefix) {
-		return pItrInvalid, nil
-	}
-
-	return &prefixDBIterator{
+	itr := &prefixDBIterator{
 		prefix: prefix,
 		start:  start,
 		end:    end,
 		source: source,
 		valid:  true,
-	}, nil
+	}
+	if !itr.seekToPrefix() {
+		return pItrInvalid, nil
+	}
+	return itr, nil
 }
 
 // Domain implements Iterator.
@@ -89,12 +83,8 @@ func (itr *prefixDBIterator) Next() {
 	itr.assertIsValid()
 	itr.source.Next()
 
-	if !itr.source.Valid() || !bytes.HasPrefix(itr.source.Key(), itr.prefix) {
+	if !itr.seekToPrefix() {
 		itr.valid = false
-	} else if bytes.Equal(itr.source.Key(), itr.prefix) {
-		// Empty keys are not allowed, so if a key exists in the database that exactly matches the
-		// prefix we need to skip it.
-		itr.Next()
 	}
 }
 
@@ -128,4 +118,21 @@ func (itr *prefixDBIterator) assertIsValid() {
 	if !itr.Valid() {
 		panic("iterator is invalid")
 	}
+}
+
+func (itr *prefixDBIterator) seekToPrefix() bool {
+	for itr.source.Valid() {
+		key := itr.source.Key()
+		// Empty keys are not allowed, so if a key exists in the database that
+		// exactly matches the prefix we skip it.
+		if bytes.Equal(key, itr.prefix) {
+			itr.source.Next()
+			continue
+		}
+		if bytes.HasPrefix(key, itr.prefix) {
+			return true
+		}
+		itr.source.Next()
+	}
+	return false
 }
