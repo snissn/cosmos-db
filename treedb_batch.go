@@ -137,10 +137,7 @@ func (b *coreBatch) WriteSync() error {
 			if err := b.kb.CommitSync(); err != nil {
 				return err
 			}
-			if b.db.forceCheckpointOnWrite {
-				return b.db.writeSyncBarrier()
-			}
-			return nil
+			return b.db.writeSyncBarrier()
 		})
 	}
 	if err := b.kb.CommitSync(); err != nil {
