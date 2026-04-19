@@ -14,7 +14,7 @@ require (
 
 require (
 	github.com/cosmos/gogoproto v1.7.2
-	github.com/snissn/gomap v0.5.1-0.20260419181837-e3f3476e40de
+	github.com/snissn/gomap v0.5.1-0.20260419185541-7698ac3c0fb5
 )
 
 require (
