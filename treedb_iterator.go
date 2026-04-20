@@ -2,6 +2,8 @@ package db
 
 import (
 	"bytes"
+	"encoding/binary"
+	"math"
 
 	"github.com/snissn/gomap/kvstore"
 )
@@ -184,6 +186,27 @@ func (it *boundedKVIterator) seek() {
 	}
 }
 
+func isPrefixedIAVLVersionRange(start, end []byte) bool {
+	if len(start) < 9 || len(end) < 9 || len(start) != len(end) {
+		return false
+	}
+	if start[len(start)-9] != 's' || end[len(end)-9] != 's' {
+		return false
+	}
+	if !bytes.Equal(start[:len(start)-9], end[:len(end)-9]) {
+		return false
+	}
+	startVersion := binary.BigEndian.Uint64(start[len(start)-8:])
+	endVersion := binary.BigEndian.Uint64(end[len(end)-8:])
+	if startVersion == 0 {
+		return false
+	}
+	if endVersion != uint64(math.MaxInt64) {
+		return false
+	}
+	return true
+}
+
 func (d *TreeDB) forwardIteratorWithIAVLFallback(start, end []byte) (kvstore.Iterator, error) {
 	it, err := d.kv.Iterator(start, end)
 	if err != nil {
@@ -205,12 +228,6 @@ func (d *TreeDB) forwardIteratorWithIAVLFallback(start, end []byte) (kvstore.Ite
 	}
 	bounded := newBoundedKVIterator(start, end, alt)
 	if bounded.Valid() || bounded.Error() != nil {
-		if treedbVisibilityOn() {
-			treedbVisibilityf(
-				"iter fallback iavl_range=true mode=open_end start=%x end=%x alt_valid=%t",
-				start, end, bounded.Valid(),
-			)
-		}
 		return bounded, nil
 	}
 
@@ -224,11 +241,5 @@ func (d *TreeDB) forwardIteratorWithIAVLFallback(start, end []byte) (kvstore.Ite
 		return nil, err
 	}
 	bounded2 := newBoundedKVIterator(start, end, alt2)
-	if treedbVisibilityOn() {
-		treedbVisibilityf(
-			"iter fallback iavl_range=true mode=prefix_scan start=%x end=%x alt_valid=%t",
-			start, end, bounded2.Valid(),
-		)
-	}
 	return bounded2, nil
 }

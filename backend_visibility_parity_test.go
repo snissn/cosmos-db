@@ -20,7 +20,6 @@ func runWithBackendVisibilityEnv(t *testing.T, tc backendVisibilityCase, fn func
 	t.Helper()
 	if tc.backend == TreeDBBackend {
 		t.Setenv(envTreeDBOpenProfile, tc.profile)
-		t.Setenv(envTreeDBForceCheckpointOnWrite, "0")
 	}
 	fn()
 }
