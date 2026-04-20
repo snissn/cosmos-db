@@ -18,10 +18,6 @@ type appendGetter interface {
 	GetAppend(key, dst []byte) ([]byte, error)
 }
 
-type checkpointer interface {
-	Checkpoint() error
-}
-
 // NewPrefixDB lets you namespace multiple DBs within a single DB.
 func NewPrefixDB(db DB, prefix []byte) *PrefixDB {
 	return &PrefixDB{
@@ -62,15 +58,6 @@ func (pdb *PrefixDB) GetAppend(key, dst []byte) ([]byte, error) {
 	}
 	dst = append(dst[:0], value...)
 	return dst, nil
-}
-
-// Checkpoint forwards a visibility/durability barrier when the underlying DB
-// supports it. Prefix wrapping does not change checkpoint scope.
-func (pdb *PrefixDB) Checkpoint() error {
-	if cp, ok := pdb.db.(checkpointer); ok {
-		return cp.Checkpoint()
-	}
-	return nil
 }
 
 // Has implements DB.
