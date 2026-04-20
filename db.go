@@ -24,6 +24,9 @@ const (
 	//   - requires gcc
 	//   - use rocksdb build tag (go build -tags rocksdb)
 	RocksDBBackend BackendType = "rocksdb"
+	// TreeDBBackend represents treedb (uses github.com/snissn/gomap/TreeDB)
+	//   - pure go
+	TreeDBBackend BackendType = "treedb"
 )
 
 type (

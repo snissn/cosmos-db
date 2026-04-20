@@ -14,6 +14,14 @@ type PrefixDB struct {
 
 var _ DB = (*PrefixDB)(nil)
 
+type appendGetter interface {
+	GetAppend(key, dst []byte) ([]byte, error)
+}
+
+type checkpointer interface {
+	Checkpoint() error
+}
+
 // NewPrefixDB lets you namespace multiple DBs within a single DB.
 func NewPrefixDB(db DB, prefix []byte) *PrefixDB {
 	return &PrefixDB{
@@ -34,6 +42,35 @@ func (pdb *PrefixDB) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 	return value, nil
+}
+
+// GetAppend fetches the value of the given key into dst when the underlying
+// DB supports append-style reads. Missing keys return (nil, nil).
+func (pdb *PrefixDB) GetAppend(key, dst []byte) ([]byte, error) {
+	if len(key) == 0 {
+		return nil, errKeyEmpty
+	}
+
+	pkey := pdb.prefixed(key)
+	if getter, ok := pdb.db.(appendGetter); ok {
+		return getter.GetAppend(pkey, dst)
+	}
+
+	value, err := pdb.db.Get(pkey)
+	if err != nil || value == nil {
+		return nil, err
+	}
+	dst = append(dst[:0], value...)
+	return dst, nil
+}
+
+// Checkpoint forwards a visibility/durability barrier when the underlying DB
+// supports it. Prefix wrapping does not change checkpoint scope.
+func (pdb *PrefixDB) Checkpoint() error {
+	if cp, ok := pdb.db.(checkpointer); ok {
+		return cp.Checkpoint()
+	}
+	return nil
 }
 
 // Has implements DB.
