@@ -35,8 +35,6 @@ var _ DB = (*TreeDB)(nil)
 
 const envTreeDBForceCheckpointOnWrite = "TREEDB_FORCE_CHECKPOINT_ON_WRITE"
 const envTreeDBOpenProfile = treedbkv.EnvOpenProfile
-const envTreeDBAllowNonRouteMode = "TREEDB_ALLOW_NON_ROUTE_MODE"
-const envTreeDBRequiredOuterLeafMode = "TREEDB_REQUIRED_OUTER_LEAF_MODE"
 const envTreeDBKeepRecent = treedbkv.EnvKeepRecent
 const envTreeDBMemtableMode = treedbkv.EnvMemtableMode
 
