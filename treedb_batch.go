@@ -112,12 +112,7 @@ func (b *coreBatch) Write() error {
 			if err := b.kb.Commit(); err != nil {
 				return err
 			}
-			if b.db.forceCheckpointOnWrite {
-				if err := b.db.writeSyncBarrier(); err != nil {
-					return err
-				}
-			}
-			return b.db.maybeCheckpointAfterWrite()
+			return nil
 		})
 	}
 	if err := b.kb.Commit(); err != nil {
@@ -136,9 +131,6 @@ func (b *coreBatch) WriteSync() error {
 		return b.db.withSerializedBatchWrite(func() error {
 			if err := b.kb.CommitSync(); err != nil {
 				return err
-			}
-			if b.db.forceCheckpointOnWrite {
-				return b.db.writeSyncBarrier()
 			}
 			return nil
 		})
