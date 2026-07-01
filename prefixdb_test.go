@@ -126,7 +126,7 @@ func Run(t *testing.T, db DB) {
 				bs := make([]byte, 4)
 				binary.LittleEndian.PutUint32(bs, uint32(key))
 				if err := db.Delete(bs); err != nil {
-					t.Errorf("Delete %q: %v", key, err)
+					t.Errorf("Delete %d: %v", key, err)
 				}
 			}
 		}()

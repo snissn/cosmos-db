@@ -36,8 +36,8 @@ func TestBackendIAVLReloadAcrossPrefixesParity(t *testing.T) {
 
 	cases := []backendVisibilityCase{
 		{name: "goleveldb", backend: GoLevelDBBackend},
-		{name: "treedb_fast", backend: TreeDBBackend, profile: "fast"},
-		{name: "treedb_wal_on_fast", backend: TreeDBBackend, profile: "wal_on_fast"},
+		{name: "treedb_command_wal_durable", backend: TreeDBBackend, profile: "command_wal_durable"},
+		{name: "treedb_command_wal_relaxed", backend: TreeDBBackend, profile: "command_wal_relaxed"},
 	}
 
 	for _, tc := range cases {
@@ -130,8 +130,8 @@ func TestBackendMetadataVisibilityParityAfterHeavyPrefixedWrites(t *testing.T) {
 
 	cases := []backendVisibilityCase{
 		{name: "goleveldb", backend: GoLevelDBBackend},
-		{name: "treedb_fast", backend: TreeDBBackend, profile: "fast"},
-		{name: "treedb_wal_on_fast", backend: TreeDBBackend, profile: "wal_on_fast"},
+		{name: "treedb_command_wal_durable", backend: TreeDBBackend, profile: "command_wal_durable"},
+		{name: "treedb_command_wal_relaxed", backend: TreeDBBackend, profile: "command_wal_relaxed"},
 	}
 
 	for _, tc := range cases {

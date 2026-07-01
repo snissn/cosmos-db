@@ -57,7 +57,7 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 		Name:                        name,
 		DBFileSuffix:                DBFileSuffix,
 		AdapterName:                 "TreeDB",
-		DefaultProfile:              treedb.ProfileWALOnFast,
+		DefaultProfile:              treedb.ProfileCommandWALDurable,
 		DefaultKeepRecent:           1,
 		DefaultAdaptiveMemtableBase: "hash_sorted",
 		ProfileEnvKey:               envTreeDBOpenProfile,
