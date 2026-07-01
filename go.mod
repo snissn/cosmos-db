@@ -6,7 +6,7 @@ require (
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/google/btree v1.1.3
 	github.com/linxGnu/grocksdb v1.8.12
-	github.com/snissn/gomap v0.6.1-0.20260701182837-7765dddb5543
+	github.com/snissn/gomap v0.6.1
 	github.com/spf13/cast v1.8.0
 	github.com/stretchr/testify v1.11.1
 	// Pinned to this version to avoid bugs in following commits. See https://github.com/cosmos/cosmos-sdk/pull/14952
@@ -50,6 +50,7 @@ require (
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
+	google.golang.org/genproto v0.0.0-20250804133106-a7a43d27e69b // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -109,6 +109,8 @@ github.com/snissn/gomap v0.6.0 h1:gMEsmR7eKOhv9jtpZchU2sfd0Qw1jOKOg0d6p5R6Jfg=
 github.com/snissn/gomap v0.6.0/go.mod h1:CC1uML6+VMvhfOoyhPeW71fLhP4rlLBn4qFn1ALm7zU=
 github.com/snissn/gomap v0.6.1-0.20260701182837-7765dddb5543 h1:u868u4hzqlS+GczbwsB7Y12vaZW2NPmzLU1E3iEb/LQ=
 github.com/snissn/gomap v0.6.1-0.20260701182837-7765dddb5543/go.mod h1:CC1uML6+VMvhfOoyhPeW71fLhP4rlLBn4qFn1ALm7zU=
+github.com/snissn/gomap v0.6.1 h1:LVz3J4NS+oMB5mzzk2V11t73nbsihhEEG+Et5NR2lIA=
+github.com/snissn/gomap v0.6.1/go.mod h1:CC1uML6+VMvhfOoyhPeW71fLhP4rlLBn4qFn1ALm7zU=
 github.com/spf13/cast v1.8.0 h1:gEN9K4b8Xws4EX0+a0reLmhq8moKn7ntRlQYgjPeCDk=
 github.com/spf13/cast v1.8.0/go.mod h1:ancEpBxwJDODSW/UG4rDrAqiKolqNNh2DX3mk86cAdo=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
@@ -172,6 +174,8 @@ golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8T
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 h1:go1bK/D/BFZV2I8cIQd1NKEZ+0owSTG1fDTci4IqFcE=
 golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+google.golang.org/genproto v0.0.0-20250804133106-a7a43d27e69b h1:eZTgydvqZO44zyTZAvMaSyAxccZZdraiSAGvqOczVvk=
+google.golang.org/genproto v0.0.0-20250804133106-a7a43d27e69b/go.mod h1:suyz2QBHQKlGIF92HEEsCfO1SwxXdk7PFLz+Zd9Uah4=
 google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd/go.mod h1:DFci5gLYBciE7Vtevhsrf46CRTquxDuWsQurQQe4oz8=
 google.golang.org/protobuf v0.0.0-20200221191635-4d8936d0db64/go.mod h1:kwYJMbMJ01Woi6D6+Kah6886xMZcty6N08ah7+eCXa0=
 google.golang.org/protobuf v0.0.0-20200228230310-ab0ca4ff8a60/go.mod h1:cfTl7dwQJ+fmap5saPgwCLgHXTUD7jkjRqWcaiX5VyM=
