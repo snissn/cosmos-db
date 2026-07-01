@@ -106,18 +106,22 @@ func (b *coreBatch) Write() error {
 	if b.done || b.kb == nil {
 		return errBatchClosed
 	}
-	b.done = true
 	if b.db != nil {
-		return b.db.withSerializedBatchWrite(func() error {
+		if err := b.db.withSerializedBatchWrite(func() error {
 			if err := b.kb.Commit(); err != nil {
 				return err
 			}
 			return nil
-		})
+		}); err != nil {
+			return err
+		}
+		b.done = true
+		return nil
 	}
 	if err := b.kb.Commit(); err != nil {
 		return err
 	}
+	b.done = true
 	return nil
 }
 
@@ -126,18 +130,22 @@ func (b *coreBatch) WriteSync() error {
 	if b.done || b.kb == nil {
 		return errBatchClosed
 	}
-	b.done = true
 	if b.db != nil {
-		return b.db.withSerializedBatchWrite(func() error {
+		if err := b.db.withSerializedBatchWrite(func() error {
 			if err := b.kb.CommitSync(); err != nil {
 				return err
 			}
 			return nil
-		})
+		}); err != nil {
+			return err
+		}
+		b.done = true
+		return nil
 	}
 	if err := b.kb.CommitSync(); err != nil {
 		return err
 	}
+	b.done = true
 	return nil
 }
 
