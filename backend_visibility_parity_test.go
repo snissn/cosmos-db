@@ -121,7 +121,7 @@ func TestBackendMetadataVisibilityParityAfterHeavyPrefixedWrites(t *testing.T) {
 		"acc", "authz", "bank", "blob", "capability",
 		"circuit", "consensus", "distribution", "evidence", "feegrant",
 		"gov", "hyperlane", "ibc", "icahost", "minfee",
-		"mint", "packetfowardmiddleware", "params", "signal", "slashing",
+		"mint", "packetforwardmiddleware", "params", "signal", "slashing",
 		"staking", "transfer", "upgrade", "warp",
 	}
 	const height = uint64(9_993_000)

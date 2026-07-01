@@ -28,7 +28,7 @@ func TestTreeDBMetadataKeysVisibleAfterHeavyPrefixedWrites(t *testing.T) {
 		"acc", "authz", "bank", "blob", "capability",
 		"circuit", "consensus", "distribution", "evidence", "feegrant",
 		"gov", "hyperlane", "ibc", "icahost", "minfee",
-		"mint", "packetfowardmiddleware", "params", "signal", "slashing",
+		"mint", "packetforwardmiddleware", "params", "signal", "slashing",
 		"staking", "transfer", "upgrade", "warp",
 	}
 	const height = uint64(9_993_000)
@@ -76,4 +76,3 @@ func TestTreeDBMetadataKeysVisibleAfterHeavyPrefixedWrites(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, latestValue, gotLatest, "s/latest should survive reopen")
 }
-
