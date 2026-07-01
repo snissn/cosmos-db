@@ -39,7 +39,7 @@
           devShells = rec {
             default = with pkgs; mkShell {
               buildInputs = [
-                go_1_23 # Use Go 1.23 version
+                go_1_26 # Use Go 1.26 version
                 rocksdb
               ];
             };
