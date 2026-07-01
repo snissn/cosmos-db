@@ -107,13 +107,16 @@ func (b *coreBatch) Write() error {
 		return errBatchClosed
 	}
 	if b.db != nil {
-		return b.db.withSerializedBatchWrite(func() error {
+		if err := b.db.withSerializedBatchWrite(func() error {
 			if err := b.kb.Commit(); err != nil {
 				return err
 			}
-			b.done = true
-			return b.db.maybeCheckpointAfterWrite()
-		})
+			return nil
+		}); err != nil {
+			return err
+		}
+		b.done = true
+		return nil
 	}
 	if err := b.kb.Commit(); err != nil {
 		return err
@@ -128,13 +131,16 @@ func (b *coreBatch) WriteSync() error {
 		return errBatchClosed
 	}
 	if b.db != nil {
-		return b.db.withSerializedBatchWrite(func() error {
+		if err := b.db.withSerializedBatchWrite(func() error {
 			if err := b.kb.CommitSync(); err != nil {
 				return err
 			}
-			b.done = true
-			return b.db.writeSyncBarrier()
-		})
+			return nil
+		}); err != nil {
+			return err
+		}
+		b.done = true
+		return nil
 	}
 	if err := b.kb.CommitSync(); err != nil {
 		return err
@@ -164,7 +170,7 @@ func (b *coreBatch) Close() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // GetByteSize implements Batch.

@@ -20,7 +20,6 @@ func runWithBackendVisibilityEnv(t *testing.T, tc backendVisibilityCase, fn func
 	t.Helper()
 	if tc.backend == TreeDBBackend {
 		t.Setenv(envTreeDBOpenProfile, tc.profile)
-		t.Setenv(envTreeDBForceCheckpointOnWrite, "0")
 	}
 	fn()
 }
@@ -37,8 +36,7 @@ func TestBackendIAVLReloadAcrossPrefixesParity(t *testing.T) {
 
 	cases := []backendVisibilityCase{
 		{name: "goleveldb", backend: GoLevelDBBackend},
-		{name: "treedb_fast", backend: TreeDBBackend, profile: "fast"},
-		{name: "treedb_wal_on_fast", backend: TreeDBBackend, profile: "wal_on_fast"},
+		{name: "treedb_command_wal_durable", backend: TreeDBBackend, profile: "command_wal_durable"},
 	}
 
 	for _, tc := range cases {
@@ -131,8 +129,7 @@ func TestBackendMetadataVisibilityParityAfterHeavyPrefixedWrites(t *testing.T) {
 
 	cases := []backendVisibilityCase{
 		{name: "goleveldb", backend: GoLevelDBBackend},
-		{name: "treedb_fast", backend: TreeDBBackend, profile: "fast"},
-		{name: "treedb_wal_on_fast", backend: TreeDBBackend, profile: "wal_on_fast"},
+		{name: "treedb_command_wal_durable", backend: TreeDBBackend, profile: "command_wal_durable"},
 	}
 
 	for _, tc := range cases {

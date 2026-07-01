@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 
 	treedb "github.com/snissn/gomap/TreeDB"
@@ -22,18 +21,16 @@ func init() {
 
 // TreeDB is a TreeDB backend.
 type TreeDB struct {
-	db                     *treedb.DB
-	kv                     *treedbadapter.DB
-	snap                   treedb.Snapshot
-	reuseReads             bool
-	readBuf                []byte
-	forceCheckpointOnWrite bool
-	batchWriteMu           sync.Mutex
+	db           *treedb.DB
+	kv           *treedbadapter.DB
+	snap         treedb.Snapshot
+	reuseReads   bool
+	readBuf      []byte
+	batchWriteMu sync.Mutex
 }
 
 var _ DB = (*TreeDB)(nil)
 
-const envTreeDBForceCheckpointOnWrite = "TREEDB_FORCE_CHECKPOINT_ON_WRITE"
 const envTreeDBOpenProfile = treedbkv.EnvOpenProfile
 const envTreeDBKeepRecent = treedbkv.EnvKeepRecent
 const envTreeDBMemtableMode = treedbkv.EnvMemtableMode
@@ -41,12 +38,6 @@ const envTreeDBMemtableMode = treedbkv.EnvMemtableMode
 func (d *TreeDB) PinSnapshot() {
 	if d.snap != nil {
 		d.snap.Close()
-	}
-	// In cached mode, AcquireSnapshot is backend-only. If we are prioritizing
-	// correctness (e.g. IAVL restore), force a backend visibility barrier first
-	// so snapshot reads cannot miss recently-written queued/memtable state.
-	if d.forceCheckpointOnWrite && d.kv != nil {
-		_ = d.kv.Checkpoint()
 	}
 	d.snap = d.db.AcquireSnapshot()
 }
@@ -58,64 +49,15 @@ func (d *TreeDB) UnpinSnapshot() {
 	}
 }
 
-func forceCheckpointOnWriteFromEnv() bool {
-	raw, ok := os.LookupEnv(envTreeDBForceCheckpointOnWrite)
-	if !ok {
-		return false
-	}
-	on, err := strconv.ParseBool(raw)
-	if err != nil {
-		return false
-	}
-	return on
-}
-
-func (d *TreeDB) maybeCheckpointAfterWrite() error {
-	if d == nil || !d.forceCheckpointOnWrite || d.kv == nil {
-		return nil
-	}
-	return d.kv.Checkpoint()
-}
-
-func (d *TreeDB) writeSyncBarrier() error {
-	if d == nil || d.db == nil {
-		return treedb.ErrClosed
-	}
-	if treedbVisibilityOn() && d.kv != nil {
-		stats := d.kv.Stats()
-		treedbVisibilityf(
-			"barrier pre checkpoint queue_len=%s queue_backlog=%s mutable_bytes=%s",
-			stats["treedb.cache.queue_len"],
-			stats["treedb.cache.queue_backlog_bytes"],
-			stats["treedb.cache.mutable_bytes"],
-		)
-	}
-	// IAVL restore/load paths depend on versioned root-key visibility immediately
-	// after Batch.WriteSync boundaries. Keep a strict backend visibility barrier
-	// here; lightweight flush has shown missing-version failures under restore.
-	if d.kv != nil {
-		err := d.kv.Checkpoint()
-		if treedbVisibilityOn() {
-			stats := d.kv.Stats()
-			treedbVisibilityf(
-				"barrier post checkpoint err=%v queue_len=%s queue_backlog=%s mutable_bytes=%s",
-				err,
-				stats["treedb.cache.queue_len"],
-				stats["treedb.cache.queue_backlog_bytes"],
-				stats["treedb.cache.mutable_bytes"],
-			)
-		}
-		return err
-	}
-	return d.db.Checkpoint()
-}
-
 func (d *TreeDB) withSerializedBatchWrite(fn func() error) error {
-	if d == nil || d.kv == nil {
+	if d == nil {
 		return treedb.ErrClosed
 	}
 	d.batchWriteMu.Lock()
 	defer d.batchWriteMu.Unlock()
+	if d.kv == nil {
+		return treedb.ErrClosed
+	}
 	return fn()
 }
 
@@ -125,12 +67,15 @@ func NewTreeDB(name, dir string, opts Options) (*TreeDB, error) {
 }
 
 func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
+	if err := validateTreeDBAdapterProfile(); err != nil {
+		return nil, err
+	}
 	opened, err := treedbkv.Open(treedbkv.OpenConfig{
 		ParentDir:                   dir,
 		Name:                        name,
 		DBFileSuffix:                DBFileSuffix,
 		AdapterName:                 "TreeDB",
-		DefaultProfile:              treedb.ProfileWALOnFast,
+		DefaultProfile:              treedb.ProfileCommandWALDurable,
 		DefaultKeepRecent:           1,
 		DefaultAdaptiveMemtableBase: "hash_sorted",
 		ProfileEnvKey:               envTreeDBOpenProfile,
@@ -142,12 +87,26 @@ func NewTreeDBAdapter(dir string, name string) (*TreeDB, error) {
 	}
 
 	adapter := &TreeDB{
-		db:                     opened.DB,
-		kv:                     opened.KV,
-		reuseReads:             false,
-		forceCheckpointOnWrite: forceCheckpointOnWriteFromEnv(),
+		db:         opened.DB,
+		kv:         opened.KV,
+		reuseReads: false,
 	}
 	return adapter, nil
+}
+
+func validateTreeDBAdapterProfile() error {
+	rawProfile := os.Getenv(envTreeDBOpenProfile)
+	if rawProfile == "" {
+		return nil
+	}
+	profile, err := treedbkv.ParsePublicProfile(rawProfile, treedb.ProfileCommandWALDurable)
+	if err != nil {
+		return fmt.Errorf("invalid %s=%q: %w", envTreeDBOpenProfile, rawProfile, err)
+	}
+	if profile != treedb.ProfileCommandWALDurable {
+		return fmt.Errorf("invalid %s=%q: TreeDB adapter supports only %q", envTreeDBOpenProfile, rawProfile, treedb.ProfileCommandWALDurable)
+	}
+	return nil
 }
 
 // Get implements DB.
@@ -290,7 +249,7 @@ func (d *TreeDB) Set(key, value []byte) error {
 	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
 		treedbVisibilityf("set prefix=%q key=%x version=%d val_len=%d", prefix, key, version, len(value))
 	}
-	return d.maybeCheckpointAfterWrite()
+	return nil
 }
 
 // SetSync implements DB.
@@ -310,7 +269,7 @@ func (d *TreeDB) SetSync(key, value []byte) error {
 	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
 		treedbVisibilityf("setsync prefix=%q key=%x version=%d val_len=%d", prefix, key, version, len(value))
 	}
-	return d.maybeCheckpointAfterWrite()
+	return nil
 }
 
 // Delete implements DB.
@@ -327,7 +286,7 @@ func (d *TreeDB) Delete(key []byte) error {
 	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
 		treedbVisibilityf("delete prefix=%q key=%x version=%d", prefix, key, version)
 	}
-	return d.maybeCheckpointAfterWrite()
+	return nil
 }
 
 // DeleteSync implements DB.
@@ -344,7 +303,7 @@ func (d *TreeDB) DeleteSync(key []byte) error {
 	if version, prefix, ok := prefixedIAVLRootVersion(key); ok {
 		treedbVisibilityf("deletesync prefix=%q key=%x version=%d", prefix, key, version)
 	}
-	return d.maybeCheckpointAfterWrite()
+	return nil
 }
 
 // Iterator implements DB.
@@ -379,6 +338,8 @@ func (d *TreeDB) ReverseIterator(start, end []byte) (Iterator, error) {
 
 // Close implements DB.
 func (d *TreeDB) Close() error {
+	d.batchWriteMu.Lock()
+	defer d.batchWriteMu.Unlock()
 	if d.db == nil {
 		return nil
 	}
@@ -424,7 +385,8 @@ func (d *TreeDB) Print() error {
 	return nil
 }
 
-// Checkpoint triggers a durable checkpoint in cached mode.
+// Checkpoint explicitly flushes cached TreeDB state into the backend. WriteSync
+// durability is provided by TreeDB's command WAL and does not require this.
 func (d *TreeDB) Checkpoint() error {
 	if d.kv == nil {
 		return treedb.ErrClosed
