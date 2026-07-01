@@ -15,6 +15,11 @@ func TestTreeDBWriteSyncDurableAndSnapshotVisibleWithoutCheckpoint(t *testing.T)
 
 	db, err := NewDB(name, TreeDBBackend, dir)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		if db != nil {
+			require.NoError(t, db.Close())
+		}
+	})
 
 	b := db.NewBatch()
 	require.NoError(t, b.Set([]byte("k1"), []byte("v1")))
@@ -34,12 +39,10 @@ func TestTreeDBWriteSyncDurableAndSnapshotVisibleWithoutCheckpoint(t *testing.T)
 	tdb.UnpinSnapshot()
 
 	require.NoError(t, db.Close())
+	db = nil
 
 	db, err = NewDB(name, TreeDBBackend, dir)
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, db.Close())
-	})
 
 	got, err = db.Get([]byte("k1"))
 	require.NoError(t, err)
