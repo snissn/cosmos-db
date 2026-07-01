@@ -162,7 +162,7 @@ func (b *coreBatch) Close() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // GetByteSize implements Batch.

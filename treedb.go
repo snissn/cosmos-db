@@ -52,11 +52,14 @@ func (d *TreeDB) UnpinSnapshot() {
 }
 
 func (d *TreeDB) withSerializedBatchWrite(fn func() error) error {
-	if d == nil || d.kv == nil {
+	if d == nil {
 		return treedb.ErrClosed
 	}
 	d.batchWriteMu.Lock()
 	defer d.batchWriteMu.Unlock()
+	if d.kv == nil {
+		return treedb.ErrClosed
+	}
 	return fn()
 }
 
@@ -337,6 +340,8 @@ func (d *TreeDB) ReverseIterator(start, end []byte) (Iterator, error) {
 
 // Close implements DB.
 func (d *TreeDB) Close() error {
+	d.batchWriteMu.Lock()
+	defer d.batchWriteMu.Unlock()
 	if d.db == nil {
 		return nil
 	}
