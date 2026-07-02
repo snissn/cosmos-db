@@ -22,6 +22,10 @@ type checkpointer interface {
 	Checkpoint() error
 }
 
+type commandWALSyncer interface {
+	SyncCommandWAL() error
+}
+
 // NewPrefixDB lets you namespace multiple DBs within a single DB.
 func NewPrefixDB(db DB, prefix []byte) *PrefixDB {
 	return &PrefixDB{
@@ -69,6 +73,15 @@ func (pdb *PrefixDB) GetAppend(key, dst []byte) ([]byte, error) {
 func (pdb *PrefixDB) Checkpoint() error {
 	if cp, ok := pdb.db.(checkpointer); ok {
 		return cp.Checkpoint()
+	}
+	return nil
+}
+
+// SyncCommandWAL forwards a command-WAL durability boundary when the underlying
+// DB supports it. Prefix wrapping does not change durability scope.
+func (pdb *PrefixDB) SyncCommandWAL() error {
+	if syncer, ok := pdb.db.(commandWALSyncer); ok {
+		return syncer.SyncCommandWAL()
 	}
 	return nil
 }

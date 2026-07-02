@@ -49,6 +49,29 @@ func TestTreeDBWriteSyncDurableAndSnapshotVisibleWithoutCheckpoint(t *testing.T)
 	require.Equal(t, []byte("v1"), got)
 }
 
+func TestTreeDBSyncCommandWALDoesNotCheckpoint(t *testing.T) {
+	t.Setenv(envTreeDBOpenProfile, "command_wal_durable")
+
+	db, err := NewDB(fmt.Sprintf("test_%x", randStr(12)), TreeDBBackend, t.TempDir())
+	require.NoError(t, err)
+	defer db.Close()
+
+	tdb, ok := db.(*TreeDB)
+	require.True(t, ok)
+
+	b := db.NewBatch()
+	require.NoError(t, b.Set([]byte("sync-command-wal"), []byte("v")))
+	require.NoError(t, b.WriteSync())
+	require.NoError(t, b.Close())
+	require.Equal(t, "0", tdb.Stats()["treedb.applied_command_lsn"])
+
+	require.NoError(t, tdb.SyncCommandWAL())
+	require.Equal(t, "0", tdb.Stats()["treedb.applied_command_lsn"])
+
+	require.NoError(t, tdb.Checkpoint())
+	require.Equal(t, "1", tdb.Stats()["treedb.applied_command_lsn"])
+}
+
 func TestTreeDBAdapterRejectsNonDurableProfile(t *testing.T) {
 	t.Setenv(envTreeDBOpenProfile, "bench")
 

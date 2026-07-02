@@ -394,6 +394,15 @@ func (d *TreeDB) Checkpoint() error {
 	return d.kv.Checkpoint()
 }
 
+// SyncCommandWAL forces TreeDB's command-WAL durability boundary without a full
+// backend checkpoint.
+func (d *TreeDB) SyncCommandWAL() error {
+	if d.kv == nil {
+		return treedb.ErrClosed
+	}
+	return d.kv.SyncCommandWAL()
+}
+
 // Stats implements DB.
 func (d *TreeDB) Stats() map[string]string {
 	if d.kv == nil {
